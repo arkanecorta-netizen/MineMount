@@ -73,12 +73,14 @@ public partial class SettingsViewModel : ObservableObject
         ILogService logService,
         ISettingsService settingsService,
         IAuthService authService,
-        IProfileService profileService)
+        IProfileService profileService,
+        IUpdateService updateService)
     {
         _logService = logService;
         _settingsService = settingsService;
         _authService = authService;
         _profileService = profileService;
+        _launcherVersion = updateService.CurrentVersion;
         _ = LoadSettingsAsync();
     }
 

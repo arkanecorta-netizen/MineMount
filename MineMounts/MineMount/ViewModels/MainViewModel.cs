@@ -70,6 +70,12 @@ public partial class MainViewModel : ObservableObject
     private string _updateStatus = string.Empty;
 
     [ObservableProperty]
+    private double _updateProgress;
+
+    [ObservableProperty]
+    private bool _isDownloading;
+
+    [ObservableProperty]
     private object? _currentPageViewModel;
 
     [ObservableProperty]
@@ -105,6 +111,7 @@ public partial class MainViewModel : ObservableObject
         _seriesViewModel = seriesViewModel;
         _seriesDetailViewModel = seriesDetailViewModel;
 
+        _version = updateService.CurrentVersion;
         _currentPageViewModel = _homeViewModel;
 
         _navigationService.Navigated += OnNavigated;
@@ -147,9 +154,25 @@ public partial class MainViewModel : ObservableObject
             BusyMessage = "Inicializando MineMount...";
 
             await _settingsService.LoadAsync();
-            await _updateService.CheckForUpdatesAsync();
 
-            _logService.Info("MineMount initialized successfully");
+            var hasUpdate = await _updateService.CheckForUpdatesAsync();
+            HasUpdates = hasUpdate;
+
+            if (hasUpdate)
+            {
+                UpdateStatus = $"Actualización v{_updateService.LatestVersion} disponible";
+                StatusText = "Actualización disponible";
+            }
+            else if (!string.IsNullOrEmpty(_updateService.LastError))
+            {
+                UpdateStatus = _updateService.LastError;
+            }
+            else
+            {
+                UpdateStatus = "MineMount está actualizado";
+            }
+
+            _logService.Info($"MineMount {Version} initialized successfully");
         }
         catch (Exception ex)
         {
@@ -276,6 +299,50 @@ public partial class MainViewModel : ObservableObject
         }
         finally
         {
+            IsBusy = false;
+            BusyMessage = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    private async Task UpdateNowAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            BusyMessage = "Descargando actualización...";
+            IsDownloading = true;
+            UpdateProgress = 0;
+
+            var progress = new Progress<double>(p =>
+            {
+                UpdateProgress = p;
+                UpdateStatus = $"Descargando v{_updateService.LatestVersion}... {p:F0}%";
+            });
+
+            var ok = await _updateService.DownloadUpdateAsync(progress);
+
+            if (ok)
+            {
+                UpdateStatus = "Instalando actualización...";
+                _logService.Info("Actualización descargada; aplicando y reiniciando");
+                _updateService.ApplyAndRestart();
+            }
+            else
+            {
+                UpdateStatus = _updateService.LastError;
+                StatusText = "Error de actualización";
+                _logService.Warning($"Descarga de actualización falló: {_updateService.LastError}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logService.Error("Update failed", ex);
+            UpdateStatus = "Error al actualizar";
+        }
+        finally
+        {
+            IsDownloading = false;
             IsBusy = false;
             BusyMessage = string.Empty;
         }

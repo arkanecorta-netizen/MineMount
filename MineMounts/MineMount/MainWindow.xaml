@@ -235,6 +235,60 @@
                             </Border>
                         </StackPanel>
 
+                        <Grid Grid.Column="1"
+                              VerticalAlignment="Center">
+                            <!-- Botón ACTUALIZAR cuando hay versión nueva -->
+                            <Button Content="ACTUALIZAR"
+                                    Command="{Binding UpdateNowCommand}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Padding="14,5"
+                                    FontSize="10"
+                                    FontWeight="SemiBold">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding HasUpdates}" Value="True" />
+                                                    <Condition Binding="{Binding IsDownloading}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+
+                            <!-- Progreso real de descarga -->
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDownloading}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <ProgressBar Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding UpdateProgress, Mode=OneWay}"
+                                             Width="160"
+                                             Height="5"
+                                             Style="{StaticResource ProgressBar.Base}" />
+                                <TextBlock Text="{Binding UpdateStatus}"
+                                           Margin="10,0,0,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="11"
+                                           Foreground="{StaticResource ForegroundSecondaryBrush}" />
+                            </StackPanel>
+                        </Grid>
+
                         <Grid Grid.Column="2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />

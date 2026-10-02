@@ -35,6 +35,7 @@ public partial class SplashScreen : Window
         _logService = logService;
 
         InitializeComponent();
+        VersionLabel.Text = updateService.CurrentVersion;
     }
 
     public async Task RunAsync()
@@ -127,11 +128,51 @@ public partial class SplashScreen : Window
     {
         var hasUpdate = await _updateService.CheckForUpdatesAsync();
 
-        if (hasUpdate || _updateService.IsUpdateAvailable)
+        if (!hasUpdate)
         {
-            SetStatus("Actualizando el launcher...");
-            await _updateService.DownloadUpdateAsync();
-            SetStatus("Comprobando actualizaciones...");
+            if (!string.IsNullOrEmpty(_updateService.LastError))
+            {
+                _logService.Info($"Splash: sin actualización — {_updateService.LastError}");
+            }
+
+            return;
+        }
+
+        _logService.Info(
+            $"Splash: actualización disponible {_updateService.CurrentVersion} → {_updateService.LatestVersion}");
+
+        var settings = await _settingsService.GetSettingsAsync();
+        if (!settings.AutoUpdate)
+        {
+            _logService.Info("Splash: AutoUpdate desactivado; se continúa con la versión actual");
+            return;
+        }
+
+        if (!_updateService.CanAutoApply)
+        {
+            _logService.Warning("Splash: límite de intentos de actualización alcanzado; se continúa");
+            return;
+        }
+
+        SetStatus($"Descargando v{_updateService.LatestVersion}...");
+        var progress = new Progress<double>(p =>
+            SetStatus($"Descargando v{_updateService.LatestVersion}... {p:F0}%"));
+
+        var ok = await _updateService.DownloadUpdateAsync(progress);
+
+        if (!ok)
+        {
+            _logService.Warning(
+                $"Splash: descarga falló ({_updateService.LastError}); se continúa con la versión actual");
+            return;
+        }
+
+        SetStatus("Instalando actualización...");
+
+        if (!_updateService.ApplyAndRestart())
+        {
+            _logService.Warning(
+                $"Splash: no se pudo aplicar ({_updateService.LastError}); se continúa");
         }
     }
 
