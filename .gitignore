@@ -1,0 +1,19 @@
+# .NET / build
+bin/
+obj/
+Publish/
+publish/
+Output/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+# Logs y datos locales
+*.log
+AppData/
+
+# Sistema
+Thumbs.db
+.DS_Store

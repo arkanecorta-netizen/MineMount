@@ -1,0 +1,132 @@
+<UserControl x:Class="MineMount.Views.GamesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="600" d:DesignWidth="800">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="JUEGOS"
+                   Style="{StaticResource TextBlock.Title}" />
+
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    Margin="0,16,0,0">
+            <TextBox Width="200"
+                     Style="{StaticResource TextBox.Base}"
+                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                     VerticalContentAlignment="Center" />
+            <Button Content="Buscar"
+                    Style="{StaticResource Button.Secondary}"
+                    Command="{Binding FilterVersionsCommand}"
+                    Margin="8,0,0,0" />
+            <Button Content="Actualizar"
+                    Style="{StaticResource Button.Secondary}"
+                    Command="{Binding RefreshCommand}"
+                    Margin="8,0,0,0" />
+        </StackPanel>
+
+        <TabControl Grid.Row="2"
+                    Margin="0,16,0,0"
+                    Background="Transparent">
+            <TabItem Header="VERSIONES">
+                <Grid>
+                    <ListBox ItemsSource="{Binding Versions}"
+                             SelectedItem="{Binding SelectedVersion}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Margin="0,8,0,0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource BackgroundCardBrush}"
+                                        CornerRadius="8"
+                                        Padding="16,12"
+                                        Margin="0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="14" />
+                                            <TextBlock Text="{Binding ReleaseDate, StringFormat={}{0:dd/MM/yyyy}}"
+                                                       Style="{StaticResource TextBlock.Muted}"
+                                                       FontSize="11" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Type}"
+                                                       Style="{StaticResource TextBlock.Caption}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,12,0" />
+                                            <Button Content="Instalar"
+                                                    Style="{StaticResource Button.Primary}"
+                                                    Command="{Binding DataContext.InstallVersionCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}"
+                                                    Padding="12,6" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="MODPACKS">
+                <Grid>
+                    <ListBox ItemsSource="{Binding Modpacks}"
+                             SelectedItem="{Binding SelectedModpack}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Margin="0,8,0,0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource BackgroundCardBrush}"
+                                        CornerRadius="8"
+                                        Padding="16,12"
+                                        Margin="0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="14" />
+                                            <TextBlock Text="{Binding Description}"
+                                                       Style="{StaticResource TextBlock.Muted}"
+                                                       FontSize="11"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding ModCount, StringFormat='{}{0} mods'}"
+                                                       Style="{StaticResource TextBlock.Caption}"
+                                                       FontSize="10" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Content="Instalar"
+                                                Style="{StaticResource Button.Primary}"
+                                                Command="{Binding DataContext.InstallModpackCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                CommandParameter="{Binding}"
+                                                Padding="12,6"
+                                                VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</UserControl>

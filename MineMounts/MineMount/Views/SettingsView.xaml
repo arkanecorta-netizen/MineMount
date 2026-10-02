@@ -1,0 +1,219 @@
+<UserControl x:Class="MineMount.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="600" d:DesignWidth="800">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="CONFIGURACIÓN"
+                   Style="{StaticResource TextBlock.Title}" />
+
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,16,0,0"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- Account Section -->
+                <Border Style="{StaticResource Card}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="CUENTA"
+                                   Style="{StaticResource TextBlock.Heading}"
+                                   Margin="0,0,0,12" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0"
+                                        Visibility="{Binding IsLoggedIn, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                <TextBlock Text="Email"
+                                           Style="{StaticResource TextBlock.Secondary}"
+                                           Margin="0,0,0,4" />
+                                <TextBox Width="250"
+                                         Style="{StaticResource TextBox.Base}"
+                                         Text="{Binding Email}"
+                                         HorizontalAlignment="Left" />
+                                <TextBlock Text="Contraseña"
+                                           Style="{StaticResource TextBlock.Secondary}"
+                                           Margin="0,12,0,4" />
+                                <PasswordBox Width="250"
+                                             Style="{StaticResource PasswordBox.Base}"
+                                             HorizontalAlignment="Left" />
+                                <Button Content="Iniciar Sesión"
+                                        Style="{StaticResource Button.Primary}"
+                                        Command="{Binding LoginCommand}"
+                                        Margin="0,16,0,0"
+                                        HorizontalAlignment="Left" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="0"
+                                        Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="{Binding UserName}"
+                                           Style="{StaticResource TextBlock.Heading}" />
+                                <TextBlock Text="{Binding Email}"
+                                           Style="{StaticResource TextBlock.Secondary}"
+                                           Margin="0,4,0,0" />
+                                <TextBlock Text="{Binding LastLogin, StringFormat='Último acceso: {0:g}'}"
+                                           Style="{StaticResource TextBlock.Muted}"
+                                           Margin="0,4,0,0" />
+                                <Button Content="Cerrar Sesión"
+                                        Style="{StaticResource Button.Secondary}"
+                                        Command="{Binding LogoutCommand}"
+                                        Margin="0,16,0,0"
+                                        HorizontalAlignment="Left" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Game Settings -->
+                <Border Style="{StaticResource Card}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="JUEGO"
+                                   Style="{StaticResource TextBlock.Heading}"
+                                   Margin="0,0,0,12" />
+
+                        <TextBlock Text="RAM Asignada (MB)"
+                                   Style="{StaticResource TextBlock.Secondary}"
+                                   Margin="0,0,0,4" />
+                        <Slider Minimum="{Binding MinRAM}"
+                                Maximum="{Binding MaxRAM}"
+                                Value="{Binding AllocatedRAM}"
+                                Style="{StaticResource Slider.Base}"
+                                Width="300"
+                                HorizontalAlignment="Left"
+                                TickFrequency="512"
+                                IsSnapToTickEnabled="True" />
+                        <TextBlock Text="{Binding AllocatedRAM, StringFormat='{}{0} MB'}"
+                                   Style="{StaticResource TextBlock.Accent}"
+                                   FontWeight="SemiBold"
+                                   Margin="0,4,0,12" />
+
+                        <TextBlock Text="Ruta de Java"
+                                   Style="{StaticResource TextBlock.Secondary}"
+                                   Margin="0,0,0,4" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBox Width="300"
+                                     Style="{StaticResource TextBox.Base}"
+                                     Text="{Binding JavaPath}"
+                                     VerticalContentAlignment="Center" />
+                            <Button Content="..."
+                                    Style="{StaticResource Button.Secondary}"
+                                    Command="{Binding BrowseJavaPathCommand}"
+                                    Margin="8,0,0,0"
+                                    Padding="12,8" />
+                        </StackPanel>
+
+                        <TextBlock Text="Directorio del Juego"
+                                   Style="{StaticResource TextBlock.Secondary}"
+                                   Margin="0,12,0,4" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBox Width="300"
+                                     Style="{StaticResource TextBox.Base}"
+                                     Text="{Binding GameDirectory}"
+                                     VerticalContentAlignment="Center" />
+                            <Button Content="..."
+                                    Style="{StaticResource Button.Secondary}"
+                                    Command="{Binding BrowseGameDirectoryCommand}"
+                                    Margin="8,0,0,0"
+                                    Padding="12,8" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Launcher Settings -->
+                <Border Style="{StaticResource Card}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="LAUNCHER"
+                                   Style="{StaticResource TextBlock.Heading}"
+                                   Margin="0,0,0,12" />
+
+                        <CheckBox Content="Actualizaciones automáticas"
+                                  Style="{StaticResource CheckBox.Base}"
+                                  IsChecked="{Binding AutoUpdate}"
+                                  Margin="0,0,0,8" />
+                        <CheckBox Content="Mostrar noticias"
+                                  Style="{StaticResource CheckBox.Base}"
+                                  IsChecked="{Binding ShowNews}"
+                                  Margin="0,0,0,8" />
+                        <CheckBox Content="Habilitar animaciones"
+                                  Style="{StaticResource CheckBox.Base}"
+                                  IsChecked="{Binding EnableAnimations}"
+                                  Margin="0,0,0,8" />
+                        <CheckBox Content="Habilitar sonidos"
+                                  Style="{StaticResource CheckBox.Base}"
+                                  IsChecked="{Binding EnableSounds}"
+                                  Margin="0,0,0,8" />
+
+                        <TextBlock Text="Tema"
+                                   Style="{StaticResource TextBlock.Secondary}"
+                                   Margin="0,12,0,4" />
+                        <ComboBox Width="150"
+                                  Style="{StaticResource ComboBox.Base}"
+                                  SelectedValuePath="Tag"
+                                  SelectedValue="{Binding Theme, Mode=TwoWay}"
+                                  AutomationProperties.Name="Tema"
+                                  HorizontalAlignment="Left">
+                            <ComboBoxItem Content="Oscuro" Tag="Dark" />
+                            <ComboBoxItem Content="Claro" Tag="Light" />
+                        </ComboBox>
+
+                        <TextBlock Text="Idioma"
+                                   Style="{StaticResource TextBlock.Secondary}"
+                                   Margin="0,12,0,4" />
+                        <ComboBox Width="150"
+                                  Style="{StaticResource ComboBox.Base}"
+                                  SelectedValuePath="Tag"
+                                  SelectedValue="{Binding Language, Mode=TwoWay}"
+                                  AutomationProperties.Name="Idioma"
+                                  HorizontalAlignment="Left">
+                            <ComboBoxItem Content="Español" Tag="es-ES" />
+                            <ComboBoxItem Content="English" Tag="en-US" />
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
+                <!-- Profiles -->
+                <Border Style="{StaticResource Card}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="PERFILES"
+                                   Style="{StaticResource TextBlock.Heading}"
+                                   Margin="0,0,0,12" />
+                        <Button Content="Crear Nuevo Perfil"
+                                Style="{StaticResource Button.Secondary}"
+                                Command="{Binding CreateProfileCommand}"
+                                HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Actions -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Margin="0,16,0,0">
+                    <Button Content="Restablecer"
+                            Style="{StaticResource Button.Secondary}"
+                            Command="{Binding ResetSettingsCommand}"
+                            Margin="0,0,8,0" />
+                    <Button Content="Guardar"
+                            Style="{StaticResource Button.Primary}"
+                            Command="{Binding SaveSettingsCommand}" />
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
