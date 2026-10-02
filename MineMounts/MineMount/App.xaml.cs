@@ -82,6 +82,10 @@ public partial class App : Application
         services.AddSingleton<IProfileService, ProfileService>();
         services.AddSingleton<ILogService, LogService>();
         services.AddSingleton<INavigationService, NavigationService>();
+        services.AddSingleton<ISeriesStorageService, SeriesStorageService>();
+        services.AddSingleton<ISeriesCatalogService, SeriesCatalogService>();
+        services.AddSingleton<ISeriesResourceService, SeriesResourceService>();
+        services.AddSingleton<ISeriesInstallService, SeriesInstallService>();
         services.AddSingleton<ISeriesService, SeriesService>();
 
         // ViewModels

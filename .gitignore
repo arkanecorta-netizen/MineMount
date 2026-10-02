@@ -17,3 +17,9 @@ AppData/
 # Sistema
 Thumbs.db
 .DS_Store
+
+# Paquetes de Series (generados por Series/pack.ps1). Se publican como assets
+# de GitHub Releases con tag {id}-v{version} y NUNCA como release "latest"
+# (publicarlas como prerelease para no romper el updater de MineMount).
+Series/**/*.zip
+Series/**/stage/

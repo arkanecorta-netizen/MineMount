@@ -91,52 +91,76 @@ public enum SeriesStatus
     MissingFiles
 }
 
-public class SeriesFileManifest
+public class SeriesResourceRef
 {
-    public string Name { get; set; } = string.Empty;
-    public string Url { get; set; } = string.Empty;
-    public string Path { get; set; } = string.Empty;
-    public string? Hash { get; set; }
-    public long? Size { get; set; }
-    public bool Required { get; set; } = true;
+    public string Tag { get; set; } = string.Empty;
+    public string Asset { get; set; } = string.Empty;
 }
 
-public class SeriesManifest
+public class SeriesDefinition
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Version { get; set; } = "1.0.0";
     public string Description { get; set; } = string.Empty;
-    public string Image { get; set; } = string.Empty;
+    public string Logo { get; set; } = string.Empty;
+    public string Banner { get; set; } = string.Empty;
     public bool Available { get; set; } = true;
-    public List<SeriesFileManifest> Files { get; set; } = new();
+    public SeriesResourceRef Resources { get; set; } = new();
 }
 
-public class SeriesInstallState
+public class SeriesInstallation
 {
+    public string Id { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public DateTime InstalledAt { get; set; } = DateTime.Now;
-    public List<string> InstalledFiles { get; set; } = new();
+    public DateTime? UpdatedAt { get; set; }
+    public string Status { get; set; } = "installed";
+    public string Path { get; set; } = string.Empty;
+    public string PackageSha256 { get; set; } = string.Empty;
+}
+
+public class SeriesPackageInfo
+{
+    public string DownloadUrl { get; set; } = string.Empty;
+    public long Size { get; set; }
+    public string Sha256 { get; set; } = string.Empty;
+}
+
+public class SeriesManifestEntry
+{
+    public string Path { get; set; } = string.Empty;
+    public string Sha256 { get; set; } = string.Empty;
+    public long Size { get; set; }
+}
+
+public class SeriesPackageManifest
+{
+    public string Id { get; set; } = string.Empty;
+    public string Version { get; set; } = string.Empty;
+    public List<SeriesManifestEntry> Files { get; set; } = new();
 }
 
 public class SeriesInfo
 {
-    public SeriesManifest Manifest { get; set; } = new();
+    public SeriesDefinition Definition { get; set; } = new();
     public string InstalledVersion { get; set; } = string.Empty;
+    public string InstallPath { get; set; } = string.Empty;
     public SeriesStatus Status { get; set; } = SeriesStatus.NotInstalled;
 
-    public string Name => Manifest.Name;
-    public string Id => Manifest.Id;
-    public string Version => Manifest.Version;
-    public string Description => Manifest.Description;
-    public string Image => Manifest.Image;
-    public bool IsAvailable => Manifest.Available;
+    public string Name => Definition.Name;
+    public string Id => Definition.Id;
+    public string Version => Definition.Version;
+    public string Description => Definition.Description;
+    public string Logo => Definition.Logo;
+    public string Banner => Definition.Banner;
+    public bool IsAvailable => Definition.Available;
 
     public string StatusText => Status switch
     {
         SeriesStatus.ComingSoon => "Próximamente",
-        SeriesStatus.NotInstalled => "No instalado",
-        SeriesStatus.Installed => "TODO INSTALADO",
+        SeriesStatus.NotInstalled => "NO INSTALADO",
+        SeriesStatus.Installed => "INSTALADA",
         SeriesStatus.UpdateAvailable => "ACTUALIZACIÓN DISPONIBLE",
         SeriesStatus.MissingFiles => "FALTAN ARCHIVOS",
         _ => string.Empty
@@ -149,11 +173,14 @@ public class SeriesInfo
 
 public class SeriesProgress
 {
-    public int FileIndex { get; set; }
-    public int FileCount { get; set; }
-    public string FileName { get; set; } = string.Empty;
+    public int StepIndex { get; set; }
+    public int StepCount { get; set; } = 3;
+    public string StepName { get; set; } = string.Empty;
     public double Percent { get; set; }
     public string Message { get; set; } = string.Empty;
+    public long BytesReceived { get; set; }
+    public long TotalBytes { get; set; }
+    public double SpeedBps { get; set; }
 }
 
 public class SeriesOperationResult

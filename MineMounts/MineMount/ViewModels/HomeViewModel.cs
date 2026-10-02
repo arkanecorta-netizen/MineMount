@@ -13,28 +13,19 @@ public partial class HomeViewModel : ObservableObject
     private readonly INewsService _newsService;
 
     [ObservableProperty]
-    private string _welcomeMessage = "Bienvenido a MineMount";
-
-    [ObservableProperty]
-    private string _gameVersion = "1.21.4";
-
-    [ObservableProperty]
-    private string _modpackName = "Vanilla";
-
-    [ObservableProperty]
-    private string _statusText = "Listo";
-
-    [ObservableProperty]
-    private bool _isPlaying;
-
-    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNews))]
     private ObservableCollection<NewsItem> _newsItems = new();
 
-    [ObservableProperty]
-    private string _bannerText = "MINECRAFT";
+    public bool HasNews => NewsItems.Count > 0;
 
     [ObservableProperty]
-    private string _bannerSubtitle = "La aventura comienza aquí";
+    private string _bannerText = "BIENVENIDO A MINEMOUNT";
+
+    [ObservableProperty]
+    private string _bannerSubtitle = "Descubrí, instalá y gestioná tus series desde un solo lugar";
+
+    [ObservableProperty]
+    private bool _isLoadingNews;
 
     public HomeViewModel(ILogService logService, INewsService newsService)
     {
@@ -47,6 +38,7 @@ public partial class HomeViewModel : ObservableObject
     {
         try
         {
+            IsLoadingNews = true;
             var news = await _newsService.GetNewsAsync();
             NewsItems = new ObservableCollection<NewsItem>(news);
         }
@@ -54,30 +46,9 @@ public partial class HomeViewModel : ObservableObject
         {
             _logService.Error("Failed to load news", ex);
         }
-    }
-
-    [RelayCommand]
-    private async Task PlayAsync()
-    {
-        try
-        {
-            IsPlaying = true;
-            StatusText = "Iniciando Minecraft...";
-            _logInfo("Starting Minecraft...");
-
-            await Task.Delay(2000);
-
-            StatusText = "Minecraft en ejecución";
-            _logInfo("Minecraft started");
-        }
-        catch (Exception ex)
-        {
-            _logError("Failed to start Minecraft", ex);
-            StatusText = "Error al iniciar";
-        }
         finally
         {
-            IsPlaying = false;
+            IsLoadingNews = false;
         }
     }
 
@@ -86,7 +57,4 @@ public partial class HomeViewModel : ObservableObject
     {
         _ = LoadNewsAsync();
     }
-
-    private void _logInfo(string message) => _logService.Info(message);
-    private void _logError(string message, Exception ex) => _logService.Error(message, ex);
 }

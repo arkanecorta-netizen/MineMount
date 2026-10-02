@@ -4,80 +4,126 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="800">
+             d:DesignHeight="600" d:DesignWidth="700">
 
     <UserControl.Resources>
         <LinearGradientBrush x:Key="SeriesBannerFallbackBrush" StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#FF241040" Offset="0" />
             <GradientStop Color="#FF150A26" Offset="1" />
         </LinearGradientBrush>
+
+        <Style x:Key="SeriesInfoPill" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}" />
+            <Setter Property="CornerRadius" Value="9999" />
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
     </UserControl.Resources>
 
-    <Grid Margin="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <Grid>
 
-        <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,8">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Command="{Binding BackCommand}"
-                        ToolTip="Volver a Series"
-                        AutomationProperties.Name="Volver"
-                        VerticalAlignment="Center">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource Button.Icon}">
-                            <Setter Property="Padding" Value="8" />
-                        </Style>
-                    </Button.Style>
-                    <ContentControl Content="{StaticResource IconBack}"
-                                    Width="20" Height="20"
-                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                </Button>
-                <TextBlock Text="{Binding Name}"
-                           Style="{StaticResource TextBlock.Title}"
-                           VerticalAlignment="Center"
-                           Margin="12,0,0,0" />
-            </StackPanel>
-        </Grid>
+    <!-- Estado vacío: ninguna serie seleccionada -->
+    <StackPanel HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsHitTestVisible="False">
+        <StackPanel.Style>
+            <Style TargetType="StackPanel">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding HasSelection}" Value="False">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </StackPanel.Style>
+        <ContentControl Content="{StaticResource IconLogo}"
+                        Width="48" Height="48"
+                        HorizontalAlignment="Center"
+                        Opacity="0.5" />
+        <TextBlock Text="Selecciona una serie"
+                   Style="{StaticResource TextBlock.Secondary}"
+                   HorizontalAlignment="Center"
+                   Margin="0,12,0,0" />
+        <TextBlock Text="Verás aquí su detalle para instalarla o repararla"
+                   Style="{StaticResource TextBlock.Muted}"
+                   HorizontalAlignment="Center"
+                   Margin="0,4,0,0" />
+    </StackPanel>
 
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto">
-            <StackPanel>
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibilityConverter}}">
+        <StackPanel>
 
-                <!-- Banner -->
-                <Border Height="210"
-                        CornerRadius="12"
+            <!-- Banner (imagen de la serie o placeholder limpio) -->
+            <Border Height="170"
+                    CornerRadius="12"
+                    ClipToBounds="True"
+                    BorderBrush="{StaticResource BorderPrimaryBrush}"
+                    BorderThickness="1"
+                    Background="{StaticResource SeriesBannerFallbackBrush}">
+                <Grid>
+                    <Ellipse Width="380" Height="380"
+                             HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                             Margin="200,60,-130,-190"
+                             Fill="{StaticResource GlowGradientBrush}"
+                             Opacity="0.5" />
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Opacity="0.6">
+                        <ContentControl Content="{StaticResource IconLogo}"
+                                        Width="56" Height="56"
+                                        HorizontalAlignment="Center" />
+                        <TextBlock Text="SERIE"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,10,0,0"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentLightBrush}" />
+                    </StackPanel>
+                    <Image Source="{Binding Banner}"
+                           Stretch="UniformToFill">
+                        <Image.Style>
+                            <Style TargetType="Image">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Banner}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Image.Style>
+                    </Image>
+                </Grid>
+            </Border>
+
+            <!-- Logo + nombre + estado -->
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Width="72" Height="72"
+                        CornerRadius="14"
                         ClipToBounds="True"
                         BorderBrush="{StaticResource BorderPrimaryBrush}"
                         BorderThickness="1"
-                        Background="{StaticResource SeriesBannerFallbackBrush}">
+                        Background="{StaticResource SeriesBannerFallbackBrush}"
+                        VerticalAlignment="Top">
                     <Grid>
-                        <Ellipse Width="380" Height="380"
-                                 HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                 Margin="200,60,-130,-190"
-                                 Fill="{StaticResource GlowGradientBrush}"
-                                 Opacity="0.6" />
-                        <StackPanel HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Opacity="0.75">
-                            <ContentControl Content="{StaticResource IconLogo}"
-                                            Width="64" Height="64"
-                                            HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding Name}"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,12,0,0"
-                                       FontSize="22"
-                                       FontWeight="Bold" />
-                        </StackPanel>
-                        <Image Source="{Binding Image}"
+                        <ContentControl Content="{StaticResource IconLogo}"
+                                        Width="30" Height="30"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Opacity="0.7" />
+                        <Image Source="{Binding Logo}"
                                Stretch="UniformToFill">
                             <Image.Style>
                                 <Style TargetType="Image">
                                     <Setter Property="Visibility" Value="Visible" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Image}" Value="">
+                                        <DataTrigger Binding="{Binding Logo}" Value="">
                                             <Setter Property="Visibility" Value="Collapsed" />
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -87,181 +133,225 @@
                     </Grid>
                 </Border>
 
-                <!-- Description -->
-                <TextBlock Text="{Binding Description}"
-                           Style="{StaticResource TextBlock.Secondary}"
-                           TextWrapping="Wrap"
-                           Margin="0,16,0,0" />
-
-                <!-- Info pills -->
-                <StackPanel Orientation="Horizontal"
-                            Margin="0,14,0,0">
-                    <Border Background="{StaticResource BackgroundTertiaryBrush}"
-                            CornerRadius="9999"
-                            Padding="12,5">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Versión"
-                                       FontSize="11"
-                                       Foreground="{StaticResource ForegroundSecondaryBrush}" />
-                            <TextBlock Text="{Binding Version}"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource AccentLightBrush}"
-                                       Margin="6,0,0,0" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border Background="{StaticResource BackgroundTertiaryBrush}"
-                            CornerRadius="9999"
-                            Padding="12,5"
-                            Margin="8,0,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Instalada"
-                                       FontSize="11"
-                                       Foreground="{StaticResource ForegroundSecondaryBrush}" />
-                            <TextBlock Text="{Binding InstalledVersion}"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource ForegroundPrimaryBrush}"
-                                       Margin="6,0,0,0">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding InstalledVersion}" Value="">
-                                                <Setter Property="Text" Value="—" />
-                                                <Setter Property="Foreground" Value="{StaticResource ForegroundMutedBrush}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-
-                <!-- Status -->
-                <StackPanel Orientation="Horizontal"
-                            Margin="0,16,0,0"
+                <StackPanel Grid.Column="1"
+                            Margin="14,0,0,0"
                             VerticalAlignment="Center">
-                    <Ellipse Width="12" Height="12"
-                             Fill="{Binding StatusBrush}"
-                             VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding StatusText}"
-                               FontSize="14"
+                    <TextBlock Text="{Binding Name}"
+                               FontSize="24"
                                FontWeight="Bold"
-                               Foreground="{Binding StatusBrush}"
-                               VerticalAlignment="Center"
-                               Margin="8,0,0,0" />
+                               TextTrimming="CharacterEllipsis" />
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,8,0,0"
+                                VerticalAlignment="Center">
+                        <Ellipse Width="10" Height="10"
+                                 Fill="{Binding StatusBrush}"
+                                 VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding StatusText}"
+                                   FontSize="13"
+                                   FontWeight="Bold"
+                                   Foreground="{Binding StatusBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0" />
+                    </StackPanel>
                 </StackPanel>
+            </Grid>
 
-                <!-- Coming soon notice -->
-                <Border Background="{StaticResource BackgroundTertiaryBrush}"
-                        CornerRadius="8"
-                        Padding="16,12"
-                        Margin="0,16,0,0">
-                    <Border.Style>
-                        <Style TargetType="Border">
+            <!-- Descripción -->
+            <TextBlock Text="{Binding Description}"
+                       Style="{StaticResource TextBlock.Secondary}"
+                       TextWrapping="Wrap"
+                       Margin="0,14,0,0" />
+
+            <!-- Info pills -->
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,12,0,0">
+                <Border Style="{StaticResource SeriesInfoPill}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Versión"
+                                   FontSize="11"
+                                   Foreground="{StaticResource ForegroundSecondaryBrush}" />
+                        <TextBlock Text="{Binding Version}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentLightBrush}"
+                                   Margin="6,0,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SeriesInfoPill}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Instalada"
+                                   FontSize="11"
+                                   Foreground="{StaticResource ForegroundSecondaryBrush}" />
+                        <TextBlock Text="{Binding InstalledVersion}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource ForegroundPrimaryBrush}"
+                                   Margin="6,0,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding InstalledVersion}" Value="">
+                                            <Setter Property="Text" Value="—" />
+                                            <Setter Property="Foreground" Value="{StaticResource ForegroundMutedBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SeriesInfoPill}"
+                        ToolTip="{Binding InstallPath}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Ubicación"
+                                   FontSize="11"
+                                   Foreground="{StaticResource ForegroundSecondaryBrush}" />
+                        <TextBlock Text="{Binding InstallPath}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource ForegroundPrimaryBrush}"
+                                   Margin="6,0,0,0"
+                                   MaxWidth="260"
+                                   TextTrimming="CharacterEllipsis">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding InstallPath}" Value="">
+                                            <Setter Property="Text" Value="—" />
+                                            <Setter Property="Foreground" Value="{StaticResource ForegroundMutedBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Coming soon notice -->
+            <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                    CornerRadius="8"
+                    Padding="16,12"
+                    Margin="0,16,0,0">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsAvailable}" Value="False">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock Text="Esta serie estará disponible próximamente."
+                           Style="{StaticResource TextBlock.Secondary}" />
+            </Border>
+
+            <!-- Action Buttons -->
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,20,0,0">
+                <Button Content="INSTALAR"
+                        Command="{Binding InstallCommand}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                            <Setter Property="Padding" Value="24,10" />
+                            <Setter Property="Margin" Value="0,0,10,0" />
                             <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsAvailable}" Value="False">
+                                <DataTrigger Binding="{Binding IsNotInstalled}" Value="True">
                                     <Setter Property="Visibility" Value="Visible" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </Border.Style>
-                    <TextBlock Text="Esta serie estará disponible próximamente."
-                               Style="{StaticResource TextBlock.Secondary}" />
-                </Border>
+                    </Button.Style>
+                </Button>
 
-                <!-- Action Buttons -->
-                <StackPanel Orientation="Horizontal"
-                            Margin="0,20,0,0">
-                    <Button Content="INSTALAR"
-                            Command="{Binding InstallCommand}"
-                            IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
-                                <Setter Property="Padding" Value="24,10" />
-                                <Setter Property="Margin" Value="0,0,10,0" />
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsNotInstalled}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
+                <Button Content="ACTUALIZAR"
+                        Command="{Binding UpdateCommand}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                            <Setter Property="Padding" Value="24,10" />
+                            <Setter Property="Margin" Value="0,0,10,0" />
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
 
-                    <Button Content="ACTUALIZAR"
-                            Padding="24,10"
-                            Command="{Binding UpdateCommand}"
-                            IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
-                                <Setter Property="Padding" Value="24,10" />
-                                <Setter Property="Margin" Value="0,0,10,0" />
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
+                <Button Content="REPARAR"
+                        Command="{Binding RepairCommand}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource Button.Secondary}">
+                            <Setter Property="Padding" Value="24,10" />
+                            <Setter Property="Margin" Value="0,0,10,0" />
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsInstalled}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
 
-                    <Button Content="REPARAR"
-                            Padding="24,10"
-                            Command="{Binding RepairCommand}"
-                            IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource Button.Secondary}">
-                                <Setter Property="Padding" Value="24,10" />
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsInstalled}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                </StackPanel>
-
-                <!-- Progress -->
-                <StackPanel Margin="0,20,0,0"
-                            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <Grid Margin="0,0,0,6">
-                        <TextBlock Text="Progreso"
-                                   Style="{StaticResource TextBlock.Secondary}" />
-                        <TextBlock HorizontalAlignment="Right"
-                                   Foreground="{StaticResource ForegroundSecondaryBrush}">
-                            <Run Text="{Binding ProgressPercent, StringFormat={}{0:F0}, Mode=OneWay}" />
-                            <Run Text=" %" />
-                        </TextBlock>
-                    </Grid>
-                    <ProgressBar Minimum="0"
-                                 Maximum="100"
-                                 Value="{Binding ProgressPercent, Mode=OneWay}"
-                                 Height="8"
-                                 Style="{StaticResource ProgressBar.Base}" />
-                    <TextBlock Text="{Binding ProgressText}"
-                               Style="{StaticResource TextBlock.Muted}"
-                               Margin="0,6,0,0"
-                               TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-
-                <!-- Result -->
-                <TextBlock Text="{Binding ResultMessage}"
-                           TextWrapping="Wrap"
-                           Margin="0,16,0,0"
-                           FontSize="13"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource AccentLightBrush}"
-                           Visibility="{Binding ResultMessage, Converter={StaticResource StringToVisibilityConverter}}" />
-
+                <Button Content="CANCELAR"
+                        Command="{Binding CancelOperationCommand}"
+                        Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource Button.Secondary}">
+                            <Setter Property="Padding" Value="24,10" />
+                        </Style>
+                    </Button.Style>
+                </Button>
             </StackPanel>
-        </ScrollViewer>
+
+            <!-- Progress -->
+            <StackPanel Margin="0,20,0,0"
+                        Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid Margin="0,0,0,6">
+                    <TextBlock Text="Progreso"
+                               Style="{StaticResource TextBlock.Secondary}" />
+                    <TextBlock HorizontalAlignment="Right"
+                               Foreground="{StaticResource ForegroundSecondaryBrush}">
+                        <Run Text="{Binding ProgressPercent, StringFormat={}{0:F0}, Mode=OneWay}" />
+                        <Run Text=" %" />
+                    </TextBlock>
+                </Grid>
+                <ProgressBar Minimum="0"
+                             Maximum="100"
+                             Value="{Binding ProgressPercent, Mode=OneWay}"
+                             Height="8"
+                             Style="{StaticResource ProgressBar.Base}" />
+                <TextBlock Text="{Binding ProgressBytesText}"
+                           Style="{StaticResource TextBlock.Caption}"
+                           Margin="0,6,0,0"
+                           Visibility="{Binding ProgressBytesText, Converter={StaticResource StringToVisibilityConverter}}" />
+                <TextBlock Text="{Binding ProgressText}"
+                           Style="{StaticResource TextBlock.Muted}"
+                           Margin="0,4,0,0"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
+            <!-- Result -->
+            <TextBlock Text="{Binding ResultMessage}"
+                       TextWrapping="Wrap"
+                       Margin="0,16,0,0"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource AccentLightBrush}"
+                       Visibility="{Binding ResultMessage, Converter={StaticResource StringToVisibilityConverter}}" />
+
+        </StackPanel>
+    </ScrollViewer>
+
     </Grid>
 </UserControl>

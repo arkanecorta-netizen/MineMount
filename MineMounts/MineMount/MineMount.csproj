@@ -29,6 +29,7 @@
     <Resource Include="Assets\Icons\*.xaml" />
     <Resource Include="Assets\Icons\*.png" />
     <Resource Include="Assets\Icons\*.ico" />
+    <Resource Include="Assets\Images\*.png" />
   </ItemGroup>
 
   <ItemGroup>

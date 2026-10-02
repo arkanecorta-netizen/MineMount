@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using MineMount.Models;
 using MineMount.Services;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
 
@@ -11,8 +12,13 @@ namespace MineMount.ViewModels;
 public partial class SeriesDetailViewModel : ObservableObject
 {
     private readonly ISeriesService _seriesService;
+    private readonly ISeriesInstallService _installService;
     private readonly INavigationService _navigationService;
     private readonly ILogService _logService;
+
+    private CancellationTokenSource? _operationCts;
+
+    public event Action? SeriesChanged;
 
     [ObservableProperty]
     private string _id = string.Empty;
@@ -24,13 +30,19 @@ public partial class SeriesDetailViewModel : ObservableObject
     private string _description = string.Empty;
 
     [ObservableProperty]
-    private string _image = string.Empty;
+    private string _logo = string.Empty;
+
+    [ObservableProperty]
+    private string _banner = string.Empty;
 
     [ObservableProperty]
     private string _version = string.Empty;
 
     [ObservableProperty]
     private string _installedVersion = string.Empty;
+
+    [ObservableProperty]
+    private string _installPath = string.Empty;
 
     [ObservableProperty]
     private string _statusText = string.Empty;
@@ -51,6 +63,9 @@ public partial class SeriesDetailViewModel : ObservableObject
     private bool _isUpdateAvailable;
 
     [ObservableProperty]
+    private bool _hasSelection;
+
+    [ObservableProperty]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -60,37 +75,50 @@ public partial class SeriesDetailViewModel : ObservableObject
     private string _progressText = string.Empty;
 
     [ObservableProperty]
+    private string _progressBytesText = string.Empty;
+
+    [ObservableProperty]
     private string _resultMessage = string.Empty;
 
     public SeriesDetailViewModel(
         ISeriesService seriesService,
+        ISeriesInstallService installService,
         INavigationService navigationService,
         ILogService logService)
     {
         _seriesService = seriesService;
+        _installService = installService;
         _navigationService = navigationService;
         _logService = logService;
     }
 
     public async Task LoadAsync(string? seriesId)
     {
-        if (string.IsNullOrWhiteSpace(seriesId)) return;
+        if (string.IsNullOrWhiteSpace(seriesId))
+        {
+            HasSelection = false;
+            return;
+        }
 
         try
         {
             var info = await _seriesService.GetSeriesAsync(seriesId);
             if (info == null)
             {
+                HasSelection = false;
                 StatusText = "Serie no encontrada";
                 return;
             }
 
+            HasSelection = true;
             Id = info.Id;
             Name = info.Name;
             Description = info.Description;
-            Image = info.Image;
+            Logo = info.Logo;
+            Banner = info.Banner;
             Version = info.Version;
             InstalledVersion = info.InstalledVersion;
+            InstallPath = info.InstallPath;
             IsAvailable = info.IsAvailable;
 
             ApplyStatus(info);
@@ -106,9 +134,9 @@ public partial class SeriesDetailViewModel : ObservableObject
     {
         StatusText = info.Status switch
         {
-            SeriesStatus.ComingSoon => "Próximamente",
+            SeriesStatus.ComingSoon => "PRÓXIMAMENTE",
             SeriesStatus.NotInstalled => "NO INSTALADO",
-            SeriesStatus.Installed => "TODO INSTALADO",
+            SeriesStatus.Installed => "INSTALADA",
             SeriesStatus.UpdateAvailable => "ACTUALIZACIÓN DISPONIBLE",
             SeriesStatus.MissingFiles => "FALTAN ARCHIVOS",
             _ => info.StatusText
@@ -131,24 +159,37 @@ public partial class SeriesDetailViewModel : ObservableObject
     [RelayCommand]
     private async Task InstallAsync()
     {
-        await RunOperationAsync(progress => _seriesService.InstallAsync(Id, progress));
+        await RunOperationAsync("Instalación",
+            (progress, ct) => _installService.InstallAsync(Id, progress, ct));
     }
 
     [RelayCommand]
     private async Task UpdateAsync()
     {
-        await RunOperationAsync(progress => _seriesService.UpdateAsync(Id, progress));
+        await RunOperationAsync("Actualización",
+            (progress, ct) => _installService.UpdateAsync(Id, progress, ct));
     }
 
     [RelayCommand]
     private async Task RepairAsync()
     {
-        await RunOperationAsync(progress => _seriesService.RepairAsync(Id, progress));
+        await RunOperationAsync("Reparación",
+            (progress, ct) => _installService.RepairAsync(Id, progress, ct));
     }
 
-    private async Task RunOperationAsync(Func<IProgress<SeriesProgress>, Task<SeriesOperationResult>> operation)
+    [RelayCommand]
+    private void CancelOperation()
+    {
+        _operationCts?.Cancel();
+    }
+
+    private async Task RunOperationAsync(
+        string verb,
+        Func<IProgress<SeriesProgress>, CancellationToken, Task<SeriesOperationResult>> operation)
     {
         if (IsBusy || string.IsNullOrWhiteSpace(Id)) return;
+
+        _operationCts = new CancellationTokenSource();
 
         try
         {
@@ -156,14 +197,16 @@ public partial class SeriesDetailViewModel : ObservableObject
             ResultMessage = string.Empty;
             ProgressPercent = 0;
             ProgressText = "Preparando...";
+            ProgressBytesText = string.Empty;
 
             var progress = new Progress<SeriesProgress>(p =>
             {
                 ProgressPercent = p.Percent;
-                ProgressText = $"{p.FileIndex}/{p.FileCount} · {p.FileName} — {p.Message}";
+                ProgressText = $"Paso {p.StepIndex}/{p.StepCount} · {p.StepName} — {p.Message}";
+                ProgressBytesText = FormatProgressBytes(p);
             });
 
-            var result = await operation(progress);
+            var result = await operation(progress, _operationCts.Token);
             ResultMessage = result.Message;
         }
         catch (Exception ex)
@@ -175,9 +218,32 @@ public partial class SeriesDetailViewModel : ObservableObject
         {
             IsBusy = false;
             ProgressText = string.Empty;
+            ProgressBytesText = string.Empty;
+            _operationCts.Dispose();
+            _operationCts = null;
         }
 
         await LoadAsync(Id);
+        SeriesChanged?.Invoke();
+    }
+
+    private static string FormatProgressBytes(SeriesProgress p)
+    {
+        if (p.TotalBytes <= 0 && p.BytesReceived <= 0) return string.Empty;
+
+        var received = FormatBytes(p.BytesReceived);
+        var total = p.TotalBytes > 0 ? FormatBytes(p.TotalBytes) : "?";
+        var speed = p.SpeedBps > 0 ? $"{FormatBytes(p.SpeedBps)}/s" : string.Empty;
+
+        return speed.Length > 0 ? $"{received} / {total} · {speed}" : $"{received} / {total}";
+    }
+
+    private static string FormatBytes(double bytes)
+    {
+        if (bytes >= 1_073_741_824) return $"{bytes / 1_073_741_824:F2} GB";
+        if (bytes >= 1_048_576) return $"{bytes / 1_048_576:F1} MB";
+        if (bytes >= 1_024) return $"{bytes / 1_024:F0} KB";
+        return $"{bytes:F0} B";
     }
 
     [RelayCommand]

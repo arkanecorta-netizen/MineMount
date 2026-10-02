@@ -4,6 +4,7 @@ using MineMount.Models;
 using MineMount.Services;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace MineMount.ViewModels;
@@ -11,11 +12,16 @@ namespace MineMount.ViewModels;
 public partial class SeriesViewModel : ObservableObject
 {
     private readonly ISeriesService _seriesService;
-    private readonly INavigationService _navigationService;
     private readonly ILogService _logService;
+
+    private string? _lastSelectedId;
 
     [ObservableProperty]
     private ObservableCollection<SeriesInfo> _series = new();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSeries))]
+    private SeriesInfo? _selectedSeries;
 
     [ObservableProperty]
     private bool _isLoading;
@@ -23,14 +29,33 @@ public partial class SeriesViewModel : ObservableObject
     [ObservableProperty]
     private string _statusText = string.Empty;
 
+    public bool HasSeries => Series.Count > 0;
+
+    public SeriesDetailViewModel Detail { get; }
+
     public SeriesViewModel(
         ISeriesService seriesService,
-        INavigationService navigationService,
+        SeriesDetailViewModel detailViewModel,
         ILogService logService)
     {
         _seriesService = seriesService;
-        _navigationService = navigationService;
         _logService = logService;
+        Detail = detailViewModel;
+        Detail.SeriesChanged += OnDetailSeriesChanged;
+        _ = RefreshAsync();
+    }
+
+    partial void OnSelectedSeriesChanged(SeriesInfo? value)
+    {
+        if (value != null)
+        {
+            _lastSelectedId = value.Id;
+            _ = Detail.LoadAsync(value.Id);
+        }
+    }
+
+    private void OnDetailSeriesChanged()
+    {
         _ = RefreshAsync();
     }
 
@@ -43,8 +68,31 @@ public partial class SeriesViewModel : ObservableObject
 
             var list = await _seriesService.GetSeriesAsync();
             Series = new ObservableCollection<SeriesInfo>(list);
+            OnPropertyChanged(nameof(HasSeries));
 
-            StatusText = $"{list.Count} series disponibles";
+            StatusText = list.Count > 0
+                ? $"{list.Count} series disponibles"
+                : "No se encontraron series";
+
+            var toSelect = list.FirstOrDefault(s => string.Equals(s.Id, _lastSelectedId, StringComparison.OrdinalIgnoreCase))
+                ?? list.FirstOrDefault();
+
+            if (toSelect != null)
+            {
+                if (SelectedSeries != null && string.Equals(SelectedSeries.Id, toSelect.Id, StringComparison.OrdinalIgnoreCase))
+                {
+                    await Detail.LoadAsync(toSelect.Id);
+                }
+                else
+                {
+                    SelectedSeries = toSelect;
+                }
+            }
+            else
+            {
+                SelectedSeries = null;
+                await Detail.LoadAsync(null);
+            }
         }
         catch (Exception ex)
         {
@@ -61,12 +109,5 @@ public partial class SeriesViewModel : ObservableObject
     private void Refresh()
     {
         _ = RefreshAsync();
-    }
-
-    [RelayCommand]
-    private void OpenSeries(string? id)
-    {
-        if (string.IsNullOrWhiteSpace(id)) return;
-        _navigationService.NavigateTo(NavigationPage.SeriesDetail, id);
     }
 }

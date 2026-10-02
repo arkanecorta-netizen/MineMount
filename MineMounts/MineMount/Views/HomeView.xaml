@@ -10,10 +10,11 @@
         <Style x:Key="NewsItemCard" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}" />
             <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="12" />
-            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="Margin" Value="0,0,16,16" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Width" Value="320" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{StaticResource BackgroundHoverBrush}" />
@@ -29,18 +30,18 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Banner Area -->
+        <!-- Hero: identidad MineMount -->
         <Border Grid.Row="0"
-                Height="200"
-                Margin="24,24,24,12"
+                Height="150"
+                Margin="24,24,24,16"
                 CornerRadius="12"
                 BorderBrush="{StaticResource BorderPrimaryBrush}"
                 BorderThickness="1"
                 ClipToBounds="True">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#FF1A1A1A" Offset="0" />
-                    <GradientStop Color="#FF2D1515" Offset="1" />
+                    <GradientStop Color="#FF1A1230" Offset="0" />
+                    <GradientStop Color="#FF241040" Offset="1" />
                 </LinearGradientBrush>
             </Border.Background>
             <Grid>
@@ -49,18 +50,18 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Glow -->
+                <!-- Glow sutil -->
                 <Ellipse Width="360" Height="360"
                          HorizontalAlignment="Right" VerticalAlignment="Bottom"
                          Margin="180,60,-120,-180"
                          Fill="{StaticResource GlowGradientBrush}"
-                         Opacity="0.5" />
+                         Opacity="0.4" />
 
                 <StackPanel Grid.Column="0"
                             VerticalAlignment="Center"
                             Margin="32,0,16,0">
                     <TextBlock Text="{Binding BannerText}"
-                               FontSize="44"
+                               FontSize="40"
                                FontWeight="Bold"
                                FontFamily="{StaticResource FontFamilyDisplay}"
                                Foreground="White"
@@ -70,179 +71,143 @@
                                Foreground="{StaticResource ForegroundSecondaryBrush}"
                                Margin="0,6,0,0"
                                TextTrimming="CharacterEllipsis" />
-                    <Border HorizontalAlignment="Left"
-                            Margin="0,14,0,0"
-                            Background="{StaticResource AccentTintBrush}"
-                            BorderBrush="{StaticResource AccentPrimaryBrush}"
-                            BorderThickness="1"
-                            CornerRadius="9999"
-                            Padding="12,5">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Versión"
-                                       FontSize="11"
-                                       Foreground="{StaticResource ForegroundSecondaryBrush}" />
-                            <TextBlock Text="{Binding GameVersion}"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource AccentLightBrush}"
-                                       Margin="6,0,0,0" />
-                        </StackPanel>
-                    </Border>
                 </StackPanel>
 
+                <!-- Logo (placeholder: reemplazar Assets/Images/placeholder-logo.png) -->
                 <Border Grid.Column="1"
-                        Width="120"
-                        Height="120"
+                        Width="96"
+                        Height="96"
                         Margin="32,0"
-                        CornerRadius="60"
+                        CornerRadius="20"
+                        ClipToBounds="True"
                         Background="{StaticResource AccentTintBrush}"
                         BorderBrush="{StaticResource AccentPrimaryBrush}"
                         BorderThickness="1.5">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="32" ShadowDepth="0" Color="#FFE53935" Opacity="0.35" />
-                    </Border.Effect>
-                    <ContentControl Content="{StaticResource IconLogo}"
-                                    Width="56" Height="56"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center" />
+                    <Image Source="/MineMount;component/Assets/Images/placeholder-logo.png"
+                           Stretch="UniformToFill" />
                 </Border>
             </Grid>
         </Border>
 
-        <!-- Content Area -->
-        <Grid Grid.Row="1" Margin="24,12,24,24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" MinWidth="0" />
-                <ColumnDefinition Width="*" MinWidth="0" />
-            </Grid.ColumnDefinitions>
+        <!-- Noticias destacadas -->
+        <Grid Grid.Row="1" Margin="24,0,24,24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-            <!-- Play Section -->
-            <Border Grid.Column="0"
-                    Style="{StaticResource Card}"
-                    Margin="0,0,12,0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="ÚLTIMAS NOVEDADES"
+                           Style="{StaticResource TextBlock.Heading}" />
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <ProgressBar Width="80" Height="4" IsIndeterminate="True"
+                                 Margin="0,0,12,0"
+                                 Visibility="{Binding IsLoadingNews, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <Button Command="{Binding RefreshNewsCommand}"
+                            ToolTip="Actualizar noticias"
+                            AutomationProperties.Name="Actualizar noticias">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource Button.Icon}">
+                                <Setter Property="Padding" Value="6" />
+                            </Style>
+                        </Button.Style>
+                        <ContentControl Content="{StaticResource IconRefresh}"
+                                        Width="16" Height="16"
+                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                    </Button>
+                </StackPanel>
+            </Grid>
 
-                    <StackPanel Grid.Row="0" Orientation="Horizontal">
-                        <TextBlock Text="JUGAR"
-                                   Style="{StaticResource TextBlock.Heading}" />
-                        <Border VerticalAlignment="Center"
-                                Margin="12,0,0,0"
-                                Background="{StaticResource BackgroundTertiaryBrush}"
-                                CornerRadius="9999"
-                                Padding="9,3">
-                            <TextBlock Text="{Binding GameVersion}"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource ForegroundSecondaryBrush}" />
-                        </Border>
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="1"
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <!-- Estado vacío -->
+                    <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                HorizontalAlignment="Center">
-                        <Button Style="{StaticResource Button.Play}"
-                                Command="{Binding PlayCommand}"
-                                IsEnabled="{Binding IsPlaying, Converter={StaticResource InverseBooleanConverter}}">
-                            <StackPanel Orientation="Horizontal">
-                                <ContentControl Content="{StaticResource IconPlay}"
-                                                Width="22" Height="22"
-                                                VerticalAlignment="Center"
-                                                Margin="0,0,12,0"
-                                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                <TextBlock Text="JUGAR"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                        <TextBlock Text="{Binding StatusText}"
+                                Margin="0,40,0,0"
+                                IsHitTestVisible="False">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasNews}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="No hay noticias por ahora"
+                                   Style="{StaticResource TextBlock.Secondary}"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="Pulsa el botón de actualizar para reintentar"
                                    Style="{StaticResource TextBlock.Muted}"
                                    HorizontalAlignment="Center"
-                                   Margin="0,16,0,0" />
+                                   Margin="0,4,0,0" />
                     </StackPanel>
 
-                    <StackPanel Grid.Row="2"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Center">
-                        <TextBlock Text="Modpack: "
-                                   Style="{StaticResource TextBlock.Secondary}" />
-                        <TextBlock Text="{Binding ModpackName}"
-                                   Style="{StaticResource TextBlock.Accent}" />
-                    </StackPanel>
-                </Grid>
-            </Border>
+                    <ItemsControl ItemsSource="{Binding NewsItems}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource NewsItemCard}">
+                                    <StackPanel>
 
-            <!-- News Section -->
-            <Border Grid.Column="1"
-                    Style="{StaticResource Card}"
-                    Margin="12,0,0,0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
+                                        <!-- Imagen de la noticia (si existe) -->
+                                        <Border Height="120"
+                                                CornerRadius="6"
+                                                ClipToBounds="True"
+                                                Margin="0,0,0,10"
+                                                Background="{StaticResource BackgroundSecondaryBrush}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ImageUrl}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Image Source="{Binding ImageUrl}"
+                                                   Stretch="UniformToFill" />
+                                        </Border>
 
-                    <Grid Grid.Row="0">
-                        <TextBlock Text="NOTICIAS"
-                                   Style="{StaticResource TextBlock.Heading}" />
-                        <Button HorizontalAlignment="Right"
-                                VerticalAlignment="Top"
-                                Command="{Binding RefreshNewsCommand}"
-                                ToolTip="Actualizar noticias">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource Button.Icon}">
-                                    <Setter Property="Padding" Value="6" />
-                                </Style>
-                            </Button.Style>
-                            <ContentControl Content="{StaticResource IconRefresh}"
-                                            Width="16" Height="16"
-                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                        </Button>
-                    </Grid>
-
-                    <ScrollViewer Grid.Row="1"
-                                  Margin="0,12,0,0"
-                                  VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding NewsItems}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Style="{StaticResource NewsItemCard}">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Title}"
-                                                       FontWeight="SemiBold"
-                                                       FontSize="13"
-                                                       TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Description}"
-                                                       Style="{StaticResource TextBlock.Muted}"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       MaxHeight="40"
-                                                       Margin="0,4,0,0" />
-                                            <StackPanel Orientation="Horizontal"
-                                                        Margin="0,6,0,0">
-                                                <Border Background="{StaticResource AccentTintBrush}"
-                                                        CornerRadius="9999"
-                                                        Padding="7,2">
-                                                    <TextBlock Text="{Binding Category}"
-                                                               FontSize="9"
-                                                               FontWeight="SemiBold"
-                                                               Foreground="{StaticResource AccentLightBrush}" />
-                                                </Border>
-                                                <TextBlock Text="{Binding Date, StringFormat={}{0:dd/MM/yyyy}}"
-                                                           Style="{StaticResource TextBlock.Caption}"
-                                                           VerticalAlignment="Center"
-                                                           Margin="8,0,0,0" />
-                                            </StackPanel>
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="14"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Description}"
+                                                   Style="{StaticResource TextBlock.Muted}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,6,0,0" />
+                                        <StackPanel Orientation="Horizontal"
+                                                    Margin="0,10,0,0">
+                                            <Border Background="{StaticResource AccentTintBrush}"
+                                                    CornerRadius="9999"
+                                                    Padding="8,3">
+                                                <TextBlock Text="{Binding Category}"
+                                                           FontSize="10"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource AccentLightBrush}" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Date, StringFormat={}{0:dd/MM/yyyy}}"
+                                                       Style="{StaticResource TextBlock.Caption}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="10,0,0,0" />
                                         </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Grid>
-            </Border>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </UserControl>
