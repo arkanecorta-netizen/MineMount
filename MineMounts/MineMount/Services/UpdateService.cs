@@ -384,9 +384,10 @@ public class UpdateService : IUpdateService
             Process.Start(new ProcessStartInfo
             {
                 FileName = scriptPath,
-                UseShellExecute = true,
-                WorkingDirectory = StageDir,
-                WindowStyle = ProcessWindowStyle.Hidden
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                WorkingDirectory = StageDir
             });
 
             RegisterApplyAttempt(LatestVersion);

@@ -87,6 +87,10 @@ public partial class App : Application
         services.AddSingleton<ISeriesResourceService, SeriesResourceService>();
         services.AddSingleton<ISeriesInstallService, SeriesInstallService>();
         services.AddSingleton<ISeriesService, SeriesService>();
+        services.AddSingleton<INotificationService, NotificationService>();
+        services.AddSingleton<IGameLauncherService, GameLauncherService>();
+        services.AddSingleton<ITempCleanupService, TempCleanupService>();
+        services.AddSingleton<IDiskSpaceService, DiskSpaceService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
@@ -120,7 +124,8 @@ public partial class App : Application
             _host.Services.GetRequiredService<IUpdateService>(),
             _host.Services.GetRequiredService<ISeriesService>(),
             _host.Services.GetRequiredService<INewsService>(),
-            _host.Services.GetRequiredService<ILogService>());
+            _host.Services.GetRequiredService<ILogService>(),
+            _host.Services.GetRequiredService<ITempCleanupService>());
 
         splash.Show();
         await splash.RunAsync();

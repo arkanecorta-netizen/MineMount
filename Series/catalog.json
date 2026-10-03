@@ -4,8 +4,8 @@
     "name": "NSE6",
     "version": "1.0.0",
     "description": "La serie principal de MineMount: mods, configuraciones, recursos y archivos necesarios para jugar.",
-    "logo": "https://raw.githubusercontent.com/arkanecorta-netizen/MineMount/main/Series/NSE6/logo.png",
-    "banner": "https://raw.githubusercontent.com/arkanecorta-netizen/MineMount/main/Series/NSE6/banner.png",
+    "logo": "https://raw.githubusercontent.com/arkanecorta-netizen/MineMount/main/MineMounts/MineMount/Assets/Series/NSE6/logo.png",
+    "banner": "https://raw.githubusercontent.com/arkanecorta-netizen/MineMount/main/MineMounts/MineMount/Assets/Series/NSE6/banner.png",
     "available": true,
     "resources": {
       "tag": "nse6-v1.0.0",

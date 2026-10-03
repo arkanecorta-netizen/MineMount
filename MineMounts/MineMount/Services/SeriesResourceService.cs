@@ -141,9 +141,39 @@ public class SeriesResourceService : ISeriesResourceService
     }
 
     // ---------------------------------------------------------------
-    //  Descarga con progreso real (bytes, %, velocidad)
+    //  Descarga con progreso real (bytes, %, velocidad) y reintentos
     // ---------------------------------------------------------------
     public async Task DownloadAsync(
+        SeriesPackageInfo package,
+        string destPath,
+        IProgress<SeriesProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        const int MaxAttempts = 3;
+        var attempt = 0;
+
+        while (true)
+        {
+            attempt++;
+            try
+            {
+                await DownloadOnceAsync(package, destPath, progress, cancellationToken);
+                return;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (attempt < MaxAttempts)
+            {
+                _logService.Warning(
+                    $"Descarga de {Path.GetFileName(destPath)} falló (intento {attempt}/{MaxAttempts}): {ex.Message}");
+                await Task.Delay(TimeSpan.FromSeconds(attempt), cancellationToken);
+            }
+        }
+    }
+
+    private async Task DownloadOnceAsync(
         SeriesPackageInfo package,
         string destPath,
         IProgress<SeriesProgress>? progress,

@@ -23,6 +23,7 @@ public partial class MainViewModel : ObservableObject
     private readonly ISettingsService _settingsService;
     private readonly IUpdateService _updateService;
     private readonly ILogService _logService;
+    private readonly INotificationService _notificationService;
 
     [ObservableProperty]
     private NavigationPage _currentPage = NavigationPage.Home;
@@ -88,11 +89,14 @@ public partial class MainViewModel : ObservableObject
     private readonly SeriesViewModel _seriesViewModel;
     private readonly SeriesDetailViewModel _seriesDetailViewModel;
 
+    public NotificationViewModel Notifications { get; }
+
     public MainViewModel(
         INavigationService navigationService,
         ISettingsService settingsService,
         IUpdateService updateService,
         ILogService logService,
+        INotificationService notificationService,
         HomeViewModel homeViewModel,
         GamesViewModel gamesViewModel,
         ServersViewModel serversViewModel,
@@ -104,12 +108,14 @@ public partial class MainViewModel : ObservableObject
         _settingsService = settingsService;
         _updateService = updateService;
         _logService = logService;
+        _notificationService = notificationService;
         _homeViewModel = homeViewModel;
         _gamesViewModel = gamesViewModel;
         _serversViewModel = serversViewModel;
         _settingsViewModel = settingsViewModel;
         _seriesViewModel = seriesViewModel;
         _seriesDetailViewModel = seriesDetailViewModel;
+        Notifications = new NotificationViewModel(notificationService);
 
         _version = updateService.CurrentVersion;
         _currentPageViewModel = _homeViewModel;
@@ -365,9 +371,11 @@ public partial class MainViewModel : ObservableObject
 
 public class NewsItem
 {
+    public string Id { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public DateTime Date { get; set; }
     public string ImageUrl { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
+    public bool Featured { get; set; }
 }

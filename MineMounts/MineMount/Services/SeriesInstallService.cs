@@ -35,6 +35,8 @@ public class SeriesInstallService : ISeriesInstallService
     private readonly ISeriesStorageService _storageService;
     private readonly ISeriesResourceService _resourceService;
     private readonly ILogService _logService;
+    private readonly IDiskSpaceService _diskSpaceService;
+    private readonly INotificationService _notificationService;
 
     private readonly string _cacheDir;
     private readonly string _stageDir;
@@ -47,12 +49,16 @@ public class SeriesInstallService : ISeriesInstallService
         ISeriesCatalogService catalogService,
         ISeriesStorageService storageService,
         ISeriesResourceService resourceService,
-        ILogService logService)
+        ILogService logService,
+        IDiskSpaceService diskSpaceService,
+        INotificationService notificationService)
     {
         _catalogService = catalogService;
         _storageService = storageService;
         _resourceService = resourceService;
         _logService = logService;
+        _diskSpaceService = diskSpaceService;
+        _notificationService = notificationService;
 
         var appData = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -139,6 +145,18 @@ public class SeriesInstallService : ISeriesInstallService
             _logService.Warning($"{verb} de {id} cancelada por el usuario");
             result.Success = false;
             result.Message = $"{verb} cancelada";
+            _notificationService.NotifyInfo("Instalación cancelada", $"{verb} cancelada por el usuario.");
+            return result;
+        }
+        catch (IOException ex) when (IsDiskFull(ex))
+        {
+            _logService.Error($"{verb} de {id}: disco lleno", ex);
+            result.Success = false;
+            result.Message = "Espacio insuficiente durante la operación.";
+            result.Errors.Add("Disco lleno");
+            _notificationService.NotifyError(
+                "Espacio insuficiente",
+                "Se quedó sin espacio en disco. Liberá espacio y reintentá.");
             return result;
         }
         catch (InvalidDataException ex)
@@ -180,6 +198,26 @@ public class SeriesInstallService : ISeriesInstallService
 
         var seriesDir = await _storageService.GetSeriesDirAsync(definition.Id);
         Directory.CreateDirectory(seriesDir);
+
+        // Espacio insuficiente: NO comenzar la descarga.
+        // Estimación: ZIP + extracción (manifest) + margen de seguridad.
+        var requiredMB = EstimateRequiredSpaceMB(package, seriesDir);
+        var freeMB = _diskSpaceService.GetFreeSpaceMB(seriesDir);
+        _logService.Info(
+            $"Espacio: {_diskSpaceService.FormatSize(freeMB * 1024 * 1024)} libres, " +
+            $"se necesitan ~{_diskSpaceService.FormatSize(requiredMB * 1024 * 1024)}");
+
+        if (freeMB >= 0 && freeMB < requiredMB)
+        {
+            result.Success = false;
+            result.Message = $"Espacio insuficiente. Necesitás ~{requiredMB} MB libres y tenés {freeMB} MB.";
+            result.Errors.Add("Espacio insuficiente en disco");
+            _notificationService.NotifyWarning(
+                "Espacio insuficiente",
+                $"Necesitás ~{_diskSpaceService.FormatSize(requiredMB * 1024 * 1024)} libres. " +
+                $"Tenés {_diskSpaceService.FormatSize(freeMB * 1024 * 1024)} disponibles.");
+            return result;
+        }
 
         var zipPath = Path.Combine(_cacheDir, $"{definition.Id}-{definition.Version}.zip");
 
@@ -272,6 +310,13 @@ public class SeriesInstallService : ISeriesInstallService
         return result;
     }
 
+    private static bool IsDiskFull(Exception ex)
+    {
+        const int ErrorDiskFull = unchecked((int)0x80070070);
+        const int ErrorHandleDiskFull = unchecked((int)0x80070027);
+        return ex.HResult == ErrorDiskFull || ex.HResult == ErrorHandleDiskFull;
+    }
+
     private bool IsCachedPackageValid(string zipPath, SeriesPackageInfo package)
     {
         try
@@ -288,6 +333,31 @@ public class SeriesInstallService : ISeriesInstallService
         {
             return false;
         }
+    }
+
+    // Estimación razonable del espacio necesario:
+    //   ZIP descargado + extracción (tamaño del manifest) + margen 20%
+    private long EstimateRequiredSpaceMB(SeriesPackageInfo package, string seriesDir)
+    {
+        long zipSize = package.Size > 0 ? package.Size : 100 * 1024 * 1024;
+
+        long extracted = 0;
+        try
+        {
+            var manifest = _storageService.ReadPackageManifestAsync(seriesDir).Result;
+            if (manifest?.Files != null)
+            {
+                extracted = manifest.Files.Sum(f => f.Size);
+            }
+        }
+        catch
+        {
+            // Sin manifest: estimar el doble del ZIP
+            extracted = zipSize * 2;
+        }
+
+        var total = (long)((zipSize + extracted) * 1.2);
+        return Math.Max(100, total / (1024 * 1024));
     }
 
     // ---------------------------------------------------------------

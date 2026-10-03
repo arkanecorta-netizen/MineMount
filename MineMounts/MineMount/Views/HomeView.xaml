@@ -4,17 +4,16 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="800">
+             d:DesignHeight="720" d:DesignWidth="1280">
 
     <UserControl.Resources>
-        <Style x:Key="NewsItemCard" TargetType="Border">
+        <Style x:Key="NewsCard" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Padding" Value="14" />
-            <Setter Property="Margin" Value="0,0,16,16" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Margin" Value="0,0,0,12" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="Width" Value="320" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{StaticResource BackgroundHoverBrush}" />
@@ -22,203 +21,360 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="NewsThumb" TargetType="Border">
+            <Setter Property="Width" Value="110" />
+            <Setter Property="Height" Value="66" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="Background" Value="{StaticResource BackgroundSecondaryBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid Margin="24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Hero: identidad MineMount con fondo -->
+        <!-- ============================================================
+             BANNER PRINCIPAL: noticia destacada o serie destacada
+             ============================================================ -->
         <Border Grid.Row="0"
-                Height="180"
-                Margin="24,24,24,16"
-                CornerRadius="12"
+                Height="220"
+                CornerRadius="14"
                 BorderBrush="{StaticResource BorderPrimaryBrush}"
                 BorderThickness="1"
                 ClipToBounds="True">
             <Grid>
-                <!-- Fondo (placeholder: reemplazar Assets/Images/hero-background.png) -->
-                <Image Source="/MineMount;component/Assets/Images/hero-background.png"
-                       Stretch="UniformToFill" />
+                <!-- Imagen de fondo (noticia destacada o banner de serie) -->
+                <Image Source="{Binding BannerImageUrl}"
+                       Stretch="UniformToFill">
+                    <Image.Style>
+                        <Style TargetType="Image">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding BannerImageUrl}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Image.Style>
+                </Image>
 
-                <!-- Degradado de legibilidad de izquierda a derecha -->
+                <!-- Degradado de legibilidad -->
                 <Border>
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                            <GradientStop Color="#D90D0D0D" Offset="0" />
-                            <GradientStop Color="#990D0D0D" Offset="0.55" />
-                            <GradientStop Color="#400D0D0D" Offset="1" />
+                            <GradientStop Color="#E60D0D0D" Offset="0" />
+                            <GradientStop Color="#A60D0D0D" Offset="0.5" />
+                            <GradientStop Color="#590D0D0D" Offset="1" />
                         </LinearGradientBrush>
                     </Border.Background>
                 </Border>
 
-                <!-- Glow sutil -->
-                <Ellipse Width="360" Height="360"
+                <!-- Glow violeta sutil -->
+                <Ellipse Width="420" Height="420"
                          HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                         Margin="180,60,-120,-180"
+                         Margin="200,80,-140,-220"
                          Fill="{StaticResource GlowGradientBrush}"
-                         Opacity="0.4" />
+                         Opacity="0.35" />
 
-                <Grid>
+                <!-- Contenido del banner -->
+                <Grid VerticalAlignment="Center" Margin="36,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" MinWidth="0" />
+                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0"
-                                VerticalAlignment="Center"
-                                Margin="32,0,16,0">
-                        <TextBlock Text="{Binding BannerText}"
-                                   FontSize="40"
+                    <StackPanel Grid.Column="0" MaxWidth="640">
+                        <TextBlock Text="{Binding BannerTitle}"
+                                   FontSize="34"
                                    FontWeight="Bold"
                                    FontFamily="{StaticResource FontFamilyDisplay}"
                                    Foreground="White"
+                                   TextWrapping="Wrap"
                                    TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding BannerSubtitle}"
-                                   FontSize="15"
+                                   FontSize="14"
                                    Foreground="{StaticResource ForegroundSecondaryBrush}"
-                                   Margin="0,6,0,0"
-                                   TextTrimming="CharacterEllipsis" />
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0"
+                                   MaxHeight="44" />
                     </StackPanel>
 
-                    <!-- Logo (placeholder: reemplazar Assets/Images/placeholder-logo.png) -->
-                    <Border Grid.Column="1"
-                            Width="96"
-                            Height="96"
-                            Margin="32,0"
-                            CornerRadius="20"
-                            ClipToBounds="True"
-                            Background="{StaticResource AccentTintBrush}"
-                            BorderBrush="{StaticResource AccentPrimaryBrush}"
-                            BorderThickness="1.5">
-                        <Image Source="/MineMount;component/Assets/Images/placeholder-logo.png"
-                               Stretch="UniformToFill" />
-                    </Border>
-                </Grid>
-            </Grid>
-        </Border>
-
-        <!-- Noticias destacadas -->
-        <Grid Grid.Row="1" Margin="24,0,24,24">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <Grid Grid.Row="0" Margin="0,0,0,12">
-                <TextBlock Text="ÚLTIMAS NOVEDADES"
-                           Style="{StaticResource TextBlock.Heading}" />
-                <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Center">
-                    <ProgressBar Width="80" Height="4" IsIndeterminate="True"
-                                 Margin="0,0,12,0"
-                                 Visibility="{Binding IsLoadingNews, Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <Button Command="{Binding RefreshNewsCommand}"
-                            ToolTip="Actualizar noticias"
-                            AutomationProperties.Name="Actualizar noticias">
+                    <!-- Botón de acción (solo cuando el banner es una serie) -->
+                    <Button Grid.Column="1"
+                            Content="{Binding BannerActionText}"
+                            Command="{Binding FeaturedActionCommand}"
+                            IsEnabled="{Binding IsFeaturedBusy, Converter={StaticResource InverseBooleanConverter}}"
+                            VerticalAlignment="Center"
+                            Margin="24,0,0,0">
                         <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource Button.Icon}">
-                                <Setter Property="Padding" Value="6" />
-                            </Style>
-                        </Button.Style>
-                        <ContentControl Content="{StaticResource IconRefresh}"
-                                        Width="16" Height="16"
-                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                    </Button>
-                </StackPanel>
-            </Grid>
-
-            <ScrollViewer Grid.Row="1"
-                          VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <!-- Estado vacío -->
-                    <StackPanel HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Margin="0,40,0,0"
-                                IsHitTestVisible="False">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
+                            <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                <Setter Property="Padding" Value="28,12" />
+                                <Setter Property="FontSize" Value="14" />
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding HasNews}" Value="False">
+                                    <DataTrigger Binding="{Binding BannerIsNews}" Value="False">
                                         <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </StackPanel.Style>
-                        <TextBlock Text="No hay noticias por ahora"
-                                   Style="{StaticResource TextBlock.Secondary}"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Text="Pulsa el botón de actualizar para reintentar"
-                                   Style="{StaticResource TextBlock.Muted}"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,4,0,0" />
-                    </StackPanel>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+            </Grid>
+        </Border>
 
-                    <ItemsControl ItemsSource="{Binding NewsItems}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Style="{StaticResource NewsItemCard}">
-                                    <StackPanel>
+        <!-- Espacio entre banner y contenido -->
+        <Grid Grid.Row="1" Height="20" />
 
-                                        <!-- Imagen de la noticia (si existe) -->
-                                        <Border Height="120"
-                                                CornerRadius="6"
-                                                ClipToBounds="True"
-                                                Margin="0,0,0,10"
-                                                Background="{StaticResource BackgroundSecondaryBrush}">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding ImageUrl}" Value="">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <Image Source="{Binding ImageUrl}"
-                                                   Stretch="UniformToFill" />
-                                        </Border>
+        <!-- ============================================================
+             CONTENIDO: NOVEDADES (izquierda) + DESTACADO (derecha)
+             ============================================================ -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" MinWidth="0" />
+                <ColumnDefinition Width="*" MinWidth="0" />
+            </Grid.ColumnDefinitions>
 
-                                        <TextBlock Text="{Binding Title}"
-                                                   FontWeight="SemiBold"
-                                                   FontSize="14"
-                                                   TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding Description}"
-                                                   Style="{StaticResource TextBlock.Muted}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,6,0,0" />
-                                        <StackPanel Orientation="Horizontal"
-                                                    Margin="0,10,0,0">
-                                            <Border Background="{StaticResource AccentTintBrush}"
-                                                    CornerRadius="9999"
-                                                    Padding="8,3">
-                                                <TextBlock Text="{Binding Category}"
-                                                           FontSize="10"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{StaticResource AccentLightBrush}" />
+            <!-- IZQUIERDA: NOVEDADES -->
+            <Grid Grid.Column="0" Margin="0,0,16,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,14">
+                    <TextBlock Text="NOVEDADES"
+                               Style="{StaticResource TextBlock.Heading}" />
+                    <ProgressBar Width="70" Height="4" IsIndeterminate="True"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center"
+                                 Visibility="{Binding IsLoadingNews, Converter={StaticResource BoolToVisibilityConverter}}" />
+                </Grid>
+
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <!-- Estado vacío -->
+                        <StackPanel HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Margin="0,40,0,0"
+                                    IsHitTestVisible="False">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasNews}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="No se pudieron cargar las novedades"
+                                       Style="{StaticResource TextBlock.Secondary}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Se reintentará automáticamente"
+                                       Style="{StaticResource TextBlock.Muted}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,4,0,0" />
+                        </StackPanel>
+
+                        <ItemsControl ItemsSource="{Binding RecentNews}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource NewsCard}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Miniatura -->
+                                            <Border Grid.Column="0" Style="{StaticResource NewsThumb}">
+                                                <Image Source="{Binding ImageUrl}"
+                                                       Stretch="UniformToFill">
+                                                    <Image.Style>
+                                                        <Style TargetType="Image">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding ImageUrl}" Value="">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Image.Style>
+                                                </Image>
                                             </Border>
-                                            <TextBlock Text="{Binding Date, StringFormat={}{0:dd/MM/yyyy}}"
-                                                       Style="{StaticResource TextBlock.Caption}"
-                                                       VerticalAlignment="Center"
-                                                       Margin="10,0,0,0" />
-                                        </StackPanel>
+
+                                            <!-- Texto -->
+                                            <StackPanel Grid.Column="1"
+                                                        Margin="12,0,0,0"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="14"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Description}"
+                                                           Style="{StaticResource TextBlock.Muted}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           MaxHeight="34"
+                                                           TextWrapping="Wrap"
+                                                           Margin="0,4,0,0" />
+                                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                    <Border Background="{StaticResource AccentTintBrush}"
+                                                            CornerRadius="9999"
+                                                            Padding="8,3">
+                                                        <TextBlock Text="{Binding Category}"
+                                                                   FontSize="10"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource AccentLightBrush}" />
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Date, StringFormat={}{0:dd/MM/yyyy}}"
+                                                               Style="{StaticResource TextBlock.Caption}"
+                                                               VerticalAlignment="Center"
+                                                               Margin="10,0,0,0" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- DERECHA: DESTACADO (serie destacada) -->
+            <Border Grid.Column="1"
+                    Style="{StaticResource Card}"
+                    Margin="16,0,0,0"
+                    Padding="16"
+                    VerticalAlignment="Top">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="DESTACADO"
+                               Style="{StaticResource TextBlock.Heading}"
+                               Margin="0,0,0,12" />
+
+                    <Grid Grid.Row="1">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding FeaturedSeries}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <StackPanel>
+                            <!-- Banner de la serie -->
+                            <Border Height="130"
+                                    CornerRadius="10"
+                                    ClipToBounds="True"
+                                    BorderBrush="{StaticResource BorderPrimaryBrush}"
+                                    BorderThickness="1"
+                                    Background="{StaticResource BackgroundSecondaryBrush}">
+                                <Grid>
+                                    <Image Source="{Binding FeaturedSeries.Banner}"
+                                           Stretch="UniformToFill">
+                                        <Image.Style>
+                                            <Style TargetType="Image">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding FeaturedSeries.Banner}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Image.Style>
+                                    </Image>
+                                    <StackPanel HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Opacity="0.6">
+                                        <TextBlock Text="SERIE"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource AccentLightBrush}"
+                                                   HorizontalAlignment="Center" />
                                     </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Nombre + estado -->
+                            <Grid Margin="0,12,0,0">
+                                <TextBlock Text="{Binding FeaturedSeries.Name}"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           TextTrimming="CharacterEllipsis" />
+                                <Border HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Background="{StaticResource AccentTintBrush}"
+                                        CornerRadius="9999"
+                                        Padding="8,3">
+                                    <TextBlock Text="{Binding FeaturedSeries.StatusText}"
+                                               FontSize="10"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource AccentLightBrush}" />
                                 </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </ScrollViewer>
+                            </Grid>
+
+                            <!-- Descripción -->
+                            <TextBlock Text="{Binding FeaturedSeries.Description}"
+                                       Style="{StaticResource TextBlock.Muted}"
+                                       TextWrapping="Wrap"
+                                       MaxHeight="40"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,8,0,0" />
+
+                            <!-- Botón de acción -->
+                            <Button Content="{Binding FeaturedActionText}"
+                                    Command="{Binding FeaturedActionCommand}"
+                                    IsEnabled="{Binding IsFeaturedBusy, Converter={StaticResource InverseBooleanConverter}}"
+                                    HorizontalAlignment="Stretch"
+                                    Margin="0,14,0,0"
+                                    Height="40">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding FeaturedActionText}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+
+                            <!-- Progreso -->
+                            <StackPanel Margin="0,10,0,0"
+                                        Visibility="{Binding IsFeaturedBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <ProgressBar Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding FeaturedProgress, Mode=OneWay}"
+                                             Height="6"
+                                             Style="{StaticResource ProgressBar.Base}" />
+                                <TextBlock Text="{Binding FeaturedProgressText}"
+                                           Style="{StaticResource TextBlock.Muted}"
+                                           FontSize="11"
+                                           Margin="0,6,0,0"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>

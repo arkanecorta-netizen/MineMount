@@ -14,6 +14,8 @@ public class LauncherSettings
     public bool ShowNews { get; set; } = true;
     public bool EnableAnimations { get; set; } = true;
     public bool EnableSounds { get; set; } = true;
+    public bool MinimizeOnLaunch { get; set; } = false;
+    public string NewsFeedUrl { get; set; } = string.Empty;
     public string Theme { get; set; } = "Dark";
     public string Language { get; set; } = "es-ES";
 }
@@ -107,6 +109,12 @@ public class SeriesDefinition
     public string Banner { get; set; } = string.Empty;
     public bool Available { get; set; } = true;
     public SeriesResourceRef Resources { get; set; } = new();
+
+    // Datos de lanzamiento (los define el catálogo; no se inventan)
+    public string MinecraftVersion { get; set; } = string.Empty;
+    public string Loader { get; set; } = string.Empty;
+    public string JVMArgs { get; set; } = string.Empty;
+    public string GameArgs { get; set; } = string.Empty;
 }
 
 public class SeriesInstallation

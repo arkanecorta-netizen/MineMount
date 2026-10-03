@@ -13,6 +13,8 @@ public partial class SeriesDetailViewModel : ObservableObject
 {
     private readonly ISeriesService _seriesService;
     private readonly ISeriesInstallService _installService;
+    private readonly IGameLauncherService _gameLauncher;
+    private readonly INotificationService _notificationService;
     private readonly INavigationService _navigationService;
     private readonly ILogService _logService;
 
@@ -83,11 +85,15 @@ public partial class SeriesDetailViewModel : ObservableObject
     public SeriesDetailViewModel(
         ISeriesService seriesService,
         ISeriesInstallService installService,
+        IGameLauncherService gameLauncher,
+        INotificationService notificationService,
         INavigationService navigationService,
         ILogService logService)
     {
         _seriesService = seriesService;
         _installService = installService;
+        _gameLauncher = gameLauncher;
+        _notificationService = notificationService;
         _navigationService = navigationService;
         _logService = logService;
     }
@@ -175,6 +181,18 @@ public partial class SeriesDetailViewModel : ObservableObject
     {
         await RunOperationAsync("Reparación",
             (progress, ct) => _installService.RepairAsync(Id, progress, ct));
+    }
+
+    [RelayCommand]
+    private async Task PlayAsync()
+    {
+        if (IsBusy || string.IsNullOrWhiteSpace(Id)) return;
+
+        var result = await _gameLauncher.LaunchAsync(Id);
+        if (!result.Success && !string.IsNullOrEmpty(result.Message))
+        {
+            _notificationService.NotifyError("No se pudo iniciar", result.Message);
+        }
     }
 
     [RelayCommand]
