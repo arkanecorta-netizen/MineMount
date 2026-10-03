@@ -133,6 +133,29 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Series Settings -->
+                <Border Style="{StaticResource Card}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="SERIES"
+                                   Style="{StaticResource TextBlock.Heading}"
+                                   Margin="0,0,0,12" />
+
+                        <TextBlock Text="Carpeta de instalación de series"
+                                   Style="{StaticResource TextBlock.Secondary}"
+                                   Margin="0,0,0,4" />
+                        <TextBox Width="420"
+                                 Style="{StaticResource TextBox.Base}"
+                                 Text="{Binding SeriesInstallPath}"
+                                 VerticalContentAlignment="Center"
+                                 AutomationProperties.Name="Carpeta de instalación de series" />
+                        <TextBlock Text="Vacío usa la predeterminada: %APPDATA%\MineMount\Series"
+                                   Style="{StaticResource TextBlock.Muted}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,0" />
+                    </StackPanel>
+                </Border>
+
                 <!-- Launcher Settings -->
                 <Border Style="{StaticResource Card}"
                         Margin="0,0,0,16">

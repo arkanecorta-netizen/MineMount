@@ -50,6 +50,7 @@ public class SeriesCatalogService : ISeriesCatalogService
     private readonly ILogService _logService;
     private readonly string _cachePath;
     private readonly object _gate = new();
+    private readonly SemaphoreSlim _fetchGate = new(1, 1);
 
     private List<SeriesDefinition>? _cache;
     private DateTime _cacheAt = DateTime.MinValue;
@@ -77,15 +78,32 @@ public class SeriesCatalogService : ISeriesCatalogService
             }
         }
 
-        var catalog = await FetchCatalogAsync(forceRefresh);
-
-        lock (_gate)
+        // Single-flight: peticiones simultáneas comparten una única descarga
+        await _fetchGate.WaitAsync();
+        try
         {
-            _cache = catalog;
-            _cacheAt = DateTime.UtcNow;
-        }
+            lock (_gate)
+            {
+                if (!forceRefresh && _cache != null && DateTime.UtcNow - _cacheAt < TimeSpan.FromMinutes(10))
+                {
+                    return new List<SeriesDefinition>(_cache);
+                }
+            }
 
-        return new List<SeriesDefinition>(catalog);
+            var catalog = await FetchCatalogAsync(forceRefresh);
+
+            lock (_gate)
+            {
+                _cache = catalog;
+                _cacheAt = DateTime.UtcNow;
+            }
+
+            return new List<SeriesDefinition>(catalog);
+        }
+        finally
+        {
+            _fetchGate.Release();
+        }
     }
 
     public async Task<SeriesDefinition?> GetDefinitionAsync(string id, bool forceRefresh = false)
@@ -152,7 +170,21 @@ public class SeriesCatalogService : ISeriesCatalogService
     private static List<SeriesDefinition> Parse(string json)
     {
         var list = JsonSerializer.Deserialize<List<SeriesDefinition>>(json, JsonOptions) ?? new();
-        list.RemoveAll(d => string.IsNullOrWhiteSpace(d.Id));
+
+        // El catálogo viene de Internet: descartar entradas con ids
+        // inválidos (path traversal) y normalizar tag/asset inseguros
+        // para que BuildTag/BuildAssetName usen valores derivados seguros.
+        list.RemoveAll(d => !SeriesValidation.IsValidSeriesId(d.Id));
+
+        foreach (var d in list)
+        {
+            if (!SeriesValidation.IsValidVersion(d.Version)) d.Version = "1.0.0";
+
+            d.Resources ??= new SeriesResourceRef();
+            if (!SeriesValidation.IsValidReleaseTag(d.Resources.Tag)) d.Resources.Tag = string.Empty;
+            if (!SeriesValidation.IsValidAssetName(d.Resources.Asset)) d.Resources.Asset = string.Empty;
+        }
+
         return list;
     }
 }

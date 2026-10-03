@@ -42,14 +42,31 @@ public class SeriesResourceService : ISeriesResourceService
         ?? "https://api.github.com";
 
     public static string BuildTag(SeriesDefinition definition)
-        => string.IsNullOrWhiteSpace(definition.Resources?.Tag)
-            ? $"{definition.Id.ToLowerInvariant()}-v{definition.Version}"
-            : definition.Resources.Tag;
+    {
+        if (!SeriesValidation.IsValidSeriesId(definition.Id)
+            || !SeriesValidation.IsValidVersion(definition.Version))
+        {
+            return string.Empty;
+        }
+
+        var tag = definition.Resources?.Tag;
+        if (SeriesValidation.IsValidReleaseTag(tag)) return tag!;
+
+        return $"{definition.Id.ToLowerInvariant()}-v{definition.Version}";
+    }
 
     public static string BuildAssetName(SeriesDefinition definition)
-        => string.IsNullOrWhiteSpace(definition.Resources?.Asset)
-            ? $"{definition.Id}-Resources.zip"
-            : definition.Resources.Asset;
+    {
+        if (!SeriesValidation.IsValidSeriesId(definition.Id))
+        {
+            return string.Empty;
+        }
+
+        var asset = definition.Resources?.Asset;
+        if (SeriesValidation.IsValidAssetName(asset)) return asset!;
+
+        return $"{definition.Id}-Resources.zip";
+    }
 
     // ---------------------------------------------------------------
     //  Resuelve el release {tag} y localiza el asset del paquete
@@ -58,6 +75,12 @@ public class SeriesResourceService : ISeriesResourceService
     {
         var tag = BuildTag(definition);
         var assetName = BuildAssetName(definition);
+        if (string.IsNullOrEmpty(tag) || string.IsNullOrEmpty(assetName))
+        {
+            _logService.Warning($"Definición de serie inválida para {definition.Id}");
+            return null;
+        }
+
         var url = $"{ApiBase}/repos/{RepoOwner}/{RepoName}/releases/tags/{tag}";
 
         try
@@ -160,12 +183,34 @@ public class SeriesResourceService : ISeriesResourceService
             });
         }
 
-        if (Uri.TryCreate(package.DownloadUrl, UriKind.Absolute, out var uri) && uri.IsFile)
+        if (!Uri.TryCreate(package.DownloadUrl, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeFile
+                && uri.Scheme != Uri.UriSchemeHttp
+                && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new InvalidOperationException("URL de descarga no compatible");
+        }
+
+        // En producción el paquete SIEMPRE viene de GitHub (HTTPS).
+        // HTTP y file:// sólo se permiten en modo de pruebas
+        // (MINEMOUNT_SERIES_API apunta a un servidor local).
+        var testMode = !string.Equals(ApiBase, "https://api.github.com", StringComparison.OrdinalIgnoreCase);
+        if (!testMode && uri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException("La URL del paquete debe ser HTTPS");
+        }
+
+        // Timeout global de descarga: sin esto una conexión truncada
+        // cuelga la operación indefinidamente (solo cancelable por el usuario)
+        using var downloadCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        downloadCts.CancelAfter(TimeSpan.FromMinutes(20));
+
+        if (uri.IsFile)
         {
             await using var source = File.OpenRead(uri.LocalPath);
             await using var target = File.Create(tempPath);
             totalLength = source.Length;
-            await CopyStreamAsync(source, target, cancellationToken, read =>
+            await CopyStreamAsync(source, target, downloadCts.Token, read =>
             {
                 totalRead = read;
                 Report("Descargando...");
@@ -173,7 +218,7 @@ public class SeriesResourceService : ISeriesResourceService
         }
         else
         {
-            using var resp = await Http.GetAsync(package.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var resp = await Http.GetAsync(package.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, downloadCts.Token);
             resp.EnsureSuccessStatusCode();
 
             if (resp.Content.Headers.ContentLength is long len && len > 0)
@@ -181,9 +226,9 @@ public class SeriesResourceService : ISeriesResourceService
                 totalLength = len;
             }
 
-            await using var source = await resp.Content.ReadAsStreamAsync(cancellationToken);
+            await using var source = await resp.Content.ReadAsStreamAsync(downloadCts.Token);
             await using var target = File.Create(tempPath);
-            await CopyStreamAsync(source, target, cancellationToken, read =>
+            await CopyStreamAsync(source, target, downloadCts.Token, read =>
             {
                 totalRead = read;
                 Report("Descargando...");

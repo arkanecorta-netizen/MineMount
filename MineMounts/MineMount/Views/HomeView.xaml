@@ -30,25 +30,29 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Hero: identidad MineMount -->
+        <!-- Hero: identidad MineMount con fondo -->
         <Border Grid.Row="0"
-                Height="150"
+                Height="180"
                 Margin="24,24,24,16"
                 CornerRadius="12"
                 BorderBrush="{StaticResource BorderPrimaryBrush}"
                 BorderThickness="1"
                 ClipToBounds="True">
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#FF1A1230" Offset="0" />
-                    <GradientStop Color="#FF241040" Offset="1" />
-                </LinearGradientBrush>
-            </Border.Background>
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MinWidth="0" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+                <!-- Fondo (placeholder: reemplazar Assets/Images/hero-background.png) -->
+                <Image Source="/MineMount;component/Assets/Images/hero-background.png"
+                       Stretch="UniformToFill" />
+
+                <!-- Degradado de legibilidad de izquierda a derecha -->
+                <Border>
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#D90D0D0D" Offset="0" />
+                            <GradientStop Color="#990D0D0D" Offset="0.55" />
+                            <GradientStop Color="#400D0D0D" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
 
                 <!-- Glow sutil -->
                 <Ellipse Width="360" Height="360"
@@ -57,35 +61,42 @@
                          Fill="{StaticResource GlowGradientBrush}"
                          Opacity="0.4" />
 
-                <StackPanel Grid.Column="0"
-                            VerticalAlignment="Center"
-                            Margin="32,0,16,0">
-                    <TextBlock Text="{Binding BannerText}"
-                               FontSize="40"
-                               FontWeight="Bold"
-                               FontFamily="{StaticResource FontFamilyDisplay}"
-                               Foreground="White"
-                               TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding BannerSubtitle}"
-                               FontSize="15"
-                               Foreground="{StaticResource ForegroundSecondaryBrush}"
-                               Margin="0,6,0,0"
-                               TextTrimming="CharacterEllipsis" />
-                </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="0" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <!-- Logo (placeholder: reemplazar Assets/Images/placeholder-logo.png) -->
-                <Border Grid.Column="1"
-                        Width="96"
-                        Height="96"
-                        Margin="32,0"
-                        CornerRadius="20"
-                        ClipToBounds="True"
-                        Background="{StaticResource AccentTintBrush}"
-                        BorderBrush="{StaticResource AccentPrimaryBrush}"
-                        BorderThickness="1.5">
-                    <Image Source="/MineMount;component/Assets/Images/placeholder-logo.png"
-                           Stretch="UniformToFill" />
-                </Border>
+                    <StackPanel Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Margin="32,0,16,0">
+                        <TextBlock Text="{Binding BannerText}"
+                                   FontSize="40"
+                                   FontWeight="Bold"
+                                   FontFamily="{StaticResource FontFamilyDisplay}"
+                                   Foreground="White"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding BannerSubtitle}"
+                                   FontSize="15"
+                                   Foreground="{StaticResource ForegroundSecondaryBrush}"
+                                   Margin="0,6,0,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <!-- Logo (placeholder: reemplazar Assets/Images/placeholder-logo.png) -->
+                    <Border Grid.Column="1"
+                            Width="96"
+                            Height="96"
+                            Margin="32,0"
+                            CornerRadius="20"
+                            ClipToBounds="True"
+                            Background="{StaticResource AccentTintBrush}"
+                            BorderBrush="{StaticResource AccentPrimaryBrush}"
+                            BorderThickness="1.5">
+                        <Image Source="/MineMount;component/Assets/Images/placeholder-logo.png"
+                               Stretch="UniformToFill" />
+                    </Border>
+                </Grid>
             </Grid>
         </Border>
 

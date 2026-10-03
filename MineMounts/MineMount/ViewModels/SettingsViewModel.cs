@@ -46,6 +46,9 @@ public partial class SettingsViewModel : ObservableObject
     private string _gameDirectory = string.Empty;
 
     [ObservableProperty]
+    private string _seriesInstallPath = string.Empty;
+
+    [ObservableProperty]
     private bool _autoUpdate = true;
 
     [ObservableProperty]
@@ -96,6 +99,7 @@ public partial class SettingsViewModel : ObservableObject
             AllocatedRAM = settings.AllocatedRAM;
             JavaPath = settings.JavaPath;
             GameDirectory = settings.GameDirectory;
+            SeriesInstallPath = settings.SeriesInstallPath;
             AutoUpdate = settings.AutoUpdate;
             ShowNews = settings.ShowNews;
             EnableAnimations = settings.EnableAnimations;
@@ -132,11 +136,20 @@ public partial class SettingsViewModel : ObservableObject
             IsLoading = true;
             StatusText = "Guardando configuración...";
 
+            if (!string.IsNullOrWhiteSpace(SeriesInstallPath)
+                && !SeriesValidation.IsValidInstallPath(SeriesInstallPath))
+            {
+                StatusText = "Ruta de series inválida";
+                IsLoading = false;
+                return;
+            }
+
             var settings = new LauncherSettings
             {
                 AllocatedRAM = AllocatedRAM,
                 JavaPath = JavaPath,
                 GameDirectory = GameDirectory,
+                SeriesInstallPath = SeriesInstallPath,
                 AutoUpdate = AutoUpdate,
                 ShowNews = ShowNews,
                 EnableAnimations = EnableAnimations,

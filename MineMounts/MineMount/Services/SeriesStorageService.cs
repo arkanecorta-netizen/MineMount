@@ -52,6 +52,11 @@ public class SeriesStorageService : ISeriesStorageService
 
     public async Task<string> GetSeriesDirAsync(string id)
     {
+        if (!SeriesValidation.IsValidSeriesId(id))
+        {
+            throw new ArgumentException($"Identificador de serie inválido: {id}");
+        }
+
         var root = await GetInstallRootAsync();
         var dir = Path.Combine(root, id);
         return dir;

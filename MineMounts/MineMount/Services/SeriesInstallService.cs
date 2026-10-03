@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.IO.Compression;
 using System.Text.Json;
@@ -17,6 +18,12 @@ public interface ISeriesInstallService
 
 public class SeriesInstallService : ISeriesInstallService
 {
+    // Guardias anti-zip-bomb: un paquete legítimo de mods
+    // rara vez supera 2 GB descomprimidos.
+    private const long MaxTotalUncompressedBytes = 4L * 1024 * 1024 * 1024;
+    private const long MaxEntryUncompressedBytes = 1L * 1024 * 1024 * 1024;
+    private const int MaxEntries = 200_000;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -31,6 +38,10 @@ public class SeriesInstallService : ISeriesInstallService
 
     private readonly string _cacheDir;
     private readonly string _stageDir;
+
+    // Serializa operaciones de la MISMA serie (dos instalaciones
+    // simultáneas de NSE6 pisarían staging y el ZIP en caché).
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
 
     public SeriesInstallService(
         ISeriesCatalogService catalogService,
@@ -99,109 +110,29 @@ public class SeriesInstallService : ISeriesInstallService
                 return result;
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-
-            Report(1, 0, "Buscando release...");
-            var package = await _resourceService.ResolvePackageAsync(definition);
-            if (package == null)
+            // Defensa en profundidad: GetSeriesDirAsync lanza si el id
+            // es inválido, pero validamos antes de tocar el sistema.
+            if (!SeriesValidation.IsValidSeriesId(definition.Id)
+                || !SeriesValidation.IsValidVersion(definition.Version))
             {
                 result.Success = false;
-                result.Message = "No se encontró el paquete de la serie en GitHub";
-                result.Errors.Add($"Release no disponible para {definition.Id} v{definition.Version}");
+                result.Message = "Definición de serie inválida";
+                result.Errors.Add($"Entrada de catálogo inválida: {definition.Id}");
                 return result;
             }
 
-            var seriesDir = await _storageService.GetSeriesDirAsync(definition.Id);
-            Directory.CreateDirectory(seriesDir);
-
-            var zipPath = Path.Combine(_cacheDir, $"{definition.Id}-{definition.Version}.zip");
-
-            // 1. Descarga (o reutiliza caché si el hash ya coincide)
-            if (File.Exists(zipPath) && IsCachedPackageValid(zipPath, package))
-            {
-                _logService.Info($"Paquete de {definition.Id} en caché, se omite la descarga");
-                Report(1, 60, "Paquete en caché");
-            }
-            else
-            {
-                var downloadProgress = new Progress<SeriesProgress>(p => progress?.Report(p));
-                await _resourceService.DownloadAsync(package, zipPath, downloadProgress, cancellationToken);
-            }
-
             cancellationToken.ThrowIfCancellationRequested();
 
-            // 2. Validar y extraer a staging
-            Report(2, 60, "Validando paquete...");
-            var stageRoot = Path.Combine(_stageDir, definition.Id);
-            if (Directory.Exists(stageRoot)) Directory.Delete(stageRoot, recursive: true);
-            Directory.CreateDirectory(stageRoot);
-
-            var manifest = ExtractAndVerify(zipPath, stageRoot, (done, total) =>
+            var gate = _locks.GetOrAdd(definition.Id, static _ => new SemaphoreSlim(1, 1));
+            await gate.WaitAsync(cancellationToken);
+            try
             {
-                var percent = total > 0 ? 60 + (done * 25.0 / total) : 85;
-                Report(2, percent, $"Extrayendo {done}/{total} archivos...");
-            }, cancellationToken);
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // 3. Fusionar en la carpeta de la serie (sobrescribe, no borra ajenos)
-            Report(3, 85, "Instalando archivos...");
-            var stagedFiles = Directory.GetFiles(stageRoot, "*", SearchOption.AllDirectories);
-            var copied = 0;
-            foreach (var source in stagedFiles)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var relative = Path.GetRelativePath(stageRoot, source);
-                if (string.Equals(relative, "manifest.json", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var dest = SeriesStorageService.ResolveInside(seriesDir, relative);
-                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                File.Copy(source, dest, overwrite: true);
-
-                copied++;
-                if (stagedFiles.Length > 0)
-                {
-                    Report(3, 85 + (copied * 14.0 / stagedFiles.Length), $"Instalando {copied}/{stagedFiles.Length}...");
-                }
+                return await RunPipelineAsync(definition, verb, progress, cancellationToken, Report);
             }
-
-            // 3b. Guardar metadatos (§18): installation.json + manifest.json
-            var installation = new SeriesInstallation
+            finally
             {
-                Id = definition.Id,
-                Version = definition.Version,
-                InstalledAt = (await _storageService.ReadInstallationAsync(seriesDir))?.InstalledAt ?? DateTime.Now,
-                UpdatedAt = DateTime.Now,
-                Status = "installed",
-                Path = seriesDir,
-                PackageSha256 = string.IsNullOrWhiteSpace(package.Sha256)
-                    ? SeriesStorageService.ComputeSha256(zipPath)
-                    : package.Sha256
-            };
-
-            await _storageService.SaveInstallationAsync(seriesDir, installation);
-
-            if (manifest != null)
-            {
-                await _storageService.SavePackageManifestAsync(seriesDir, manifest);
+                gate.Release();
             }
-
-            Report(3, 100, "Completado");
-
-            TryDeleteDirectory(stageRoot);
-
-            result.Success = true;
-            result.Installed = copied;
-            result.Message = manifest != null
-                ? $"{verb} completada · {copied} archivos · v{definition.Version}"
-                : $"{verb} completada · {copied} archivos · v{definition.Version} (sin manifest.json en el paquete)";
-
-            _logService.Info($"{verb} de {definition.Id}: {result.Message}");
-            return result;
         }
         catch (OperationCanceledException)
         {
@@ -228,6 +159,119 @@ public class SeriesInstallService : ISeriesInstallService
         }
     }
 
+    private async Task<SeriesOperationResult> RunPipelineAsync(
+        SeriesDefinition definition,
+        string verb,
+        IProgress<SeriesProgress>? progress,
+        CancellationToken cancellationToken,
+        Action<int, double, string> report)
+    {
+        var result = new SeriesOperationResult();
+
+        report(1, 0, "Buscando release...");
+        var package = await _resourceService.ResolvePackageAsync(definition);
+        if (package == null)
+        {
+            result.Success = false;
+            result.Message = "No se encontró el paquete de la serie en GitHub";
+            result.Errors.Add($"Release no disponible para {definition.Id} v{definition.Version}");
+            return result;
+        }
+
+        var seriesDir = await _storageService.GetSeriesDirAsync(definition.Id);
+        Directory.CreateDirectory(seriesDir);
+
+        var zipPath = Path.Combine(_cacheDir, $"{definition.Id}-{definition.Version}.zip");
+
+        // 1. Descarga (o reutiliza caché si el hash ya coincide)
+        if (File.Exists(zipPath) && IsCachedPackageValid(zipPath, package))
+        {
+            _logService.Info($"Paquete de {definition.Id} en caché, se omite la descarga");
+            report(1, 60, "Paquete en caché");
+        }
+        else
+        {
+            var downloadProgress = new Progress<SeriesProgress>(p => progress?.Report(p));
+            await _resourceService.DownloadAsync(package, zipPath, downloadProgress, cancellationToken);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // 2. Validar y extraer a staging
+        report(2, 60, "Validando paquete...");
+        var stageRoot = Path.Combine(_stageDir, definition.Id);
+        if (Directory.Exists(stageRoot)) Directory.Delete(stageRoot, recursive: true);
+        Directory.CreateDirectory(stageRoot);
+
+        var manifest = ExtractAndVerify(zipPath, stageRoot, (done, total) =>
+        {
+            var percent = total > 0 ? 60 + (done * 25.0 / total) : 85;
+            report(2, percent, $"Extrayendo {done}/{total} archivos...");
+        }, cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // 3. Fusionar en la carpeta de la serie (sobrescribe, no borra ajenos)
+        report(3, 85, "Instalando archivos...");
+        var stagedFiles = Directory.GetFiles(stageRoot, "*", SearchOption.AllDirectories);
+        var copied = 0;
+        foreach (var source in stagedFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var relative = Path.GetRelativePath(stageRoot, source);
+            if (string.Equals(relative, "manifest.json", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var dest = SeriesStorageService.ResolveInside(seriesDir, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            File.Copy(source, dest, overwrite: true);
+
+            copied++;
+            if (stagedFiles.Length > 0)
+            {
+                report(3, 85 + (copied * 14.0 / stagedFiles.Length), $"Instalando {copied}/{stagedFiles.Length}...");
+            }
+        }
+
+        // 3b. Guardar metadatos: installation.json + manifest.json
+        var installation = new SeriesInstallation
+        {
+            Id = definition.Id,
+            Version = definition.Version,
+            InstalledAt = (await _storageService.ReadInstallationAsync(seriesDir))?.InstalledAt ?? DateTime.Now,
+            UpdatedAt = DateTime.Now,
+            Status = "installed",
+            Path = seriesDir,
+            PackageSha256 = string.IsNullOrWhiteSpace(package.Sha256)
+                ? SeriesStorageService.ComputeSha256(zipPath)
+                : package.Sha256
+        };
+
+        await _storageService.SaveInstallationAsync(seriesDir, installation);
+
+        if (manifest != null)
+        {
+            await _storageService.SavePackageManifestAsync(seriesDir, manifest);
+        }
+
+        report(3, 100, "Completado");
+
+        TryDeleteDirectory(stageRoot);
+        TryCleanupOldPackages(definition.Id, definition.Version);
+
+        result.Success = true;
+        result.Installed = copied;
+        result.Message = manifest != null
+            ? $"{verb} completada · {copied} archivos · v{definition.Version}"
+            : $"{verb} completada · {copied} archivos · v{definition.Version} (sin manifest.json en el paquete)";
+
+        _logService.Info($"{verb} de {definition.Id}: {result.Message}");
+        return result;
+    }
+
     private bool IsCachedPackageValid(string zipPath, SeriesPackageInfo package)
     {
         try
@@ -247,7 +291,7 @@ public class SeriesInstallService : ISeriesInstallService
     }
 
     // ---------------------------------------------------------------
-    //  Extracción con protección zip-slip + verificación sha256
+    //  Extracción con protección zip-slip, zip-bomb y verificación
     // ---------------------------------------------------------------
     private static SeriesPackageManifest? ExtractAndVerify(
         string zipPath,
@@ -257,11 +301,18 @@ public class SeriesInstallService : ISeriesInstallService
     {
         SeriesPackageManifest? manifest = null;
         var extracted = 0;
+        long totalUncompressed = 0;
 
         using var archive = ZipFile.OpenRead(zipPath);
+
         if (archive.Entries.Count == 0)
         {
             throw new InvalidDataException("El paquete ZIP está vacío");
+        }
+
+        if (archive.Entries.Count > MaxEntries)
+        {
+            throw new InvalidDataException($"El paquete tiene demasiados archivos ({archive.Entries.Count})");
         }
 
         var fullStage = Path.GetFullPath(stageRoot);
@@ -272,6 +323,19 @@ public class SeriesInstallService : ISeriesInstallService
         foreach (var entry in archive.Entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            // Tamaño descomprimido conocido desde el directorio central:
+            // rechazar entradas o totales absurdos antes de extraer
+            if (entry.Length > MaxEntryUncompressedBytes)
+            {
+                throw new InvalidDataException($"Archivo demasiado grande en el paquete: {entry.FullName}");
+            }
+
+            totalUncompressed += entry.Length;
+            if (totalUncompressed > MaxTotalUncompressedBytes)
+            {
+                throw new InvalidDataException("El paquete supera el tamaño máximo permitido");
+            }
 
             var target = Path.GetFullPath(Path.Combine(fullStage, entry.FullName.Replace('/', Path.DirectorySeparatorChar)));
 
@@ -300,6 +364,11 @@ public class SeriesInstallService : ISeriesInstallService
 
             if (manifest?.Files is { Count: > 0 })
             {
+                if (manifest.Files.Count > MaxEntries)
+                {
+                    throw new InvalidDataException("El manifest lista demasiados archivos");
+                }
+
                 foreach (var file in manifest.Files)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -329,6 +398,27 @@ public class SeriesInstallService : ISeriesInstallService
         }
 
         return manifest;
+    }
+
+    private void TryCleanupOldPackages(string id, string version)
+    {
+        try
+        {
+            var current = $"{id}-{version}.zip";
+            foreach (var file in Directory.GetFiles(_cacheDir, $"{id}-*.zip"))
+            {
+                if (string.Equals(Path.GetFileName(file), current, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                File.Delete(file);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning($"No se pudieron limpiar paquetes antiguos: {ex.Message}");
+        }
     }
 
     private static void TryDeleteDirectory(string path)
