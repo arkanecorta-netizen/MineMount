@@ -7,6 +7,8 @@
     "logo": "https://raw.githubusercontent.com/arkanecorta-netizen/MineMount/main/MineMounts/MineMount/Assets/Series/NSE6/logo.png",
     "banner": "https://raw.githubusercontent.com/arkanecorta-netizen/MineMount/main/MineMounts/MineMount/Assets/Series/NSE6/banner.png",
     "available": true,
+    "minecraftVersion": "1.20.1",
+    "loader": "Forge",
     "resources": {
       "tag": "nse6-v1.0.0",
       "asset": "NSE6-Resources.zip"

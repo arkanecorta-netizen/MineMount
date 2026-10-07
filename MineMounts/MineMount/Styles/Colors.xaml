@@ -1,49 +1,83 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Background Colors -->
-    <Color x:Key="BackgroundPrimaryColor">#FF0D0D0D</Color>
-    <Color x:Key="BackgroundSecondaryColor">#FF1A1A1A</Color>
-    <Color x:Key="BackgroundTertiaryColor">#FF242424</Color>
-    <Color x:Key="BackgroundHoverColor">#FF2D2D2D</Color>
-    <Color x:Key="BackgroundPressedColor">#FF363636</Color>
-    <Color x:Key="BackgroundCardColor">#FF1E1E1E</Color>
+    <!-- ============================================================
+         MINEMOUNT · Sistema de color
+         Base #0B0B0F · Acento morado #A855F7 · Cian #22D3EE (detalles)
+         Verde #22C55E solo para éxito. Texto claro para WCAG AA.
+         ============================================================ -->
+
+    <!-- Fondo base (fallback sólido si las imágenes fallan) -->
+    <Color x:Key="BaseBackgroundColor">#FF0B0B0F</Color>
+    <Color x:Key="BackgroundPrimaryColor">#FF0B0B0F</Color>
+    <Color x:Key="BackgroundSecondaryColor">#FF121218</Color>
+    <Color x:Key="BackgroundTertiaryColor">#FF1B1B24</Color>
+    <Color x:Key="BackgroundHoverColor">#FF262633</Color>
+    <Color x:Key="BackgroundPressedColor">#FF30303F</Color>
+    <Color x:Key="BackgroundCardColor">#FF17171F</Color>
     <Color x:Key="BackgroundOverlayColor">#CC000000</Color>
 
-    <!-- Foreground Colors -->
-    <Color x:Key="ForegroundPrimaryColor">#FFFFFFFF</Color>
-    <Color x:Key="ForegroundSecondaryColor">#FFB3B3B3</Color>
-    <Color x:Key="ForegroundMutedColor">#FF808080</Color>
-    <Color x:Key="ForegroundDisabledColor">#FF4D4D4D</Color>
+    <!-- Superficies translúcidas (glassmorphism real: el fondo se ve detrás) -->
+    <!-- rgba(20,20,28,0.60) -->
+    <Color x:Key="GlassCardColor">#9914141C</Color>
+    <!-- rgba(15,15,20,0.55) para la sidebar -->
+    <Color x:Key="GlassSidebarColor">#8C0F0F14</Color>
+    <!-- rgba(255,255,255,0.08) borde de vidrio -->
+    <Color x:Key="GlassBorderColor">#14FFFFFF</Color>
+    <!-- rgba(255,255,255,0.14) borde iluminado en hover -->
+    <Color x:Key="GlassBorderHoverColor">#24FFFFFF</Color>
 
-    <!-- Accent Colors (Purple Theme - GTA 6 style) -->
+    <!-- Texto: todos claros para contraste AA sobre fondo oscuro -->
+    <Color x:Key="ForegroundPrimaryColor">#FFFFFFFF</Color>
+    <Color x:Key="ForegroundSecondaryColor">#FFD4D4D8</Color>
+    <Color x:Key="ForegroundMutedColor">#FFA1A1AA</Color>
+    <Color x:Key="ForegroundDisabledColor">#FF63636B</Color>
+
+    <!-- Acento primario morado -->
     <Color x:Key="AccentPrimaryColor">#FFA855F7</Color>
     <Color x:Key="AccentSecondaryColor">#FF7C3AED</Color>
-    <Color x:Key="AccentLightColor">#FFC084FC</Color>
+    <Color x:Key="AccentLightColor">#FFD8B4FE</Color>
     <Color x:Key="AccentDarkColor">#FF6D28D9</Color>
     <Color x:Key="AccentHoverColor">#FFB975FF</Color>
     <Color x:Key="AccentPressedColor">#FF9333EA</Color>
     <Color x:Key="AccentGlowColor">#4CA855F7</Color>
-    <Color x:Key="AccentTintColor">#26A855F7</Color>
+    <!-- Tinte morado sutil 8% sobre el fondo (#A855F7 al 8%) -->
+    <Color x:Key="AccentTintColor">#14A855F7</Color>
 
-    <!-- Border Colors -->
-    <Color x:Key="BorderPrimaryColor">#FF333333</Color>
-    <Color x:Key="BorderSecondaryColor">#FF404040</Color>
+    <!-- Acento secundario cian: barras de progreso, badges "online", detalles -->
+    <Color x:Key="CyanPrimaryColor">#FF22D3EE</Color>
+    <Color x:Key="CyanLightColor">#FF67E8F9</Color>
+    <Color x:Key="CyanGlowColor">#4C22D3EE</Color>
+
+    <!-- Verde SOLO para estados de éxito -->
+    <Color x:Key="SuccessColor">#FF22C55E</Color>
+    <Color x:Key="SuccessLightColor">#FF86EFAC</Color>
+
+    <!-- Rosa / magenta (detalles de marca secundarios) -->
+    <Color x:Key="RosePrimaryColor">#FFE879A9</Color>
+    <Color x:Key="RoseSecondaryColor">#FFD6457C</Color>
+    <Color x:Key="RoseLightColor">#FFF4A7C0</Color>
+    <Color x:Key="RoseGlowColor">#4CE879A9</Color>
+    <Color x:Key="RoseTintColor">#26E879A9</Color>
+
+    <!-- Bordes -->
+    <Color x:Key="BorderPrimaryColor">#FF2A2A35</Color>
+    <Color x:Key="BorderSecondaryColor">#FF3A3A48</Color>
     <Color x:Key="BorderAccentColor">#FFA855F7</Color>
     <Color x:Key="BorderFocusColor">#FFA855F7</Color>
 
-    <!-- Status Colors -->
-    <Color x:Key="SuccessColor">#FF4CAF50</Color>
-    <Color x:Key="WarningColor">#FFFF9800</Color>
-    <Color x:Key="ErrorColor">#FFF44336</Color>
-    <Color x:Key="InfoColor">#FF2196F3</Color>
+    <!-- Estados -->
+    <Color x:Key="WarningColor">#FFFBBF24</Color>
+    <Color x:Key="ErrorColor">#FFF87171</Color>
+    <Color x:Key="InfoColor">#FF60A5FA</Color>
 
-    <!-- ScrollBar Colors -->
-    <Color x:Key="ScrollBarBackgroundColor">#FF1A1A1A</Color>
-    <Color x:Key="ScrollBarThumbColor">#FF404040</Color>
-    <Color x:Key="ScrollBarThumbHoverColor">#FF505050</Color>
+    <!-- ScrollBar -->
+    <Color x:Key="ScrollBarBackgroundColor">#00121218</Color>
+    <Color x:Key="ScrollBarThumbColor">#FF3A3A48</Color>
+    <Color x:Key="ScrollBarThumbHoverColor">#FF52525B</Color>
 
-    <!-- SolidColorBrushes -->
+    <!-- Pinceles sólidos -->
+    <SolidColorBrush x:Key="BaseBackgroundBrush" Color="{StaticResource BaseBackgroundColor}" />
     <SolidColorBrush x:Key="BackgroundPrimaryBrush" Color="{StaticResource BackgroundPrimaryColor}" />
     <SolidColorBrush x:Key="BackgroundSecondaryBrush" Color="{StaticResource BackgroundSecondaryColor}" />
     <SolidColorBrush x:Key="BackgroundTertiaryBrush" Color="{StaticResource BackgroundTertiaryColor}" />
@@ -51,6 +85,11 @@
     <SolidColorBrush x:Key="BackgroundPressedBrush" Color="{StaticResource BackgroundPressedColor}" />
     <SolidColorBrush x:Key="BackgroundCardBrush" Color="{StaticResource BackgroundCardColor}" />
     <SolidColorBrush x:Key="BackgroundOverlayBrush" Color="{StaticResource BackgroundOverlayColor}" />
+
+    <SolidColorBrush x:Key="GlassCardBrush" Color="{StaticResource GlassCardColor}" />
+    <SolidColorBrush x:Key="GlassSidebarBrush" Color="{StaticResource GlassSidebarColor}" />
+    <SolidColorBrush x:Key="GlassBorderBrush" Color="{StaticResource GlassBorderColor}" />
+    <SolidColorBrush x:Key="GlassBorderHoverBrush" Color="{StaticResource GlassBorderHoverColor}" />
 
     <SolidColorBrush x:Key="ForegroundPrimaryBrush" Color="{StaticResource ForegroundPrimaryColor}" />
     <SolidColorBrush x:Key="ForegroundSecondaryBrush" Color="{StaticResource ForegroundSecondaryColor}" />
@@ -66,12 +105,23 @@
     <SolidColorBrush x:Key="AccentGlowBrush" Color="{StaticResource AccentGlowColor}" />
     <SolidColorBrush x:Key="AccentTintBrush" Color="{StaticResource AccentTintColor}" />
 
+    <SolidColorBrush x:Key="CyanPrimaryBrush" Color="{StaticResource CyanPrimaryColor}" />
+    <SolidColorBrush x:Key="CyanLightBrush" Color="{StaticResource CyanLightColor}" />
+    <SolidColorBrush x:Key="CyanGlowBrush" Color="{StaticResource CyanGlowColor}" />
+
+    <SolidColorBrush x:Key="RosePrimaryBrush" Color="{StaticResource RosePrimaryColor}" />
+    <SolidColorBrush x:Key="RoseSecondaryBrush" Color="{StaticResource RoseSecondaryColor}" />
+    <SolidColorBrush x:Key="RoseLightBrush" Color="{StaticResource RoseLightColor}" />
+    <SolidColorBrush x:Key="RoseGlowBrush" Color="{StaticResource RoseGlowColor}" />
+    <SolidColorBrush x:Key="RoseTintBrush" Color="{StaticResource RoseTintColor}" />
+
     <SolidColorBrush x:Key="BorderPrimaryBrush" Color="{StaticResource BorderPrimaryColor}" />
     <SolidColorBrush x:Key="BorderSecondaryBrush" Color="{StaticResource BorderSecondaryColor}" />
     <SolidColorBrush x:Key="BorderAccentBrush" Color="{StaticResource BorderAccentColor}" />
     <SolidColorBrush x:Key="BorderFocusBrush" Color="{StaticResource BorderFocusColor}" />
 
     <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+    <SolidColorBrush x:Key="SuccessLightBrush" Color="{StaticResource SuccessLightColor}" />
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
     <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}" />
     <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}" />
@@ -80,15 +130,51 @@
     <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="{StaticResource ScrollBarThumbColor}" />
     <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="{StaticResource ScrollBarThumbHoverColor}" />
 
-    <!-- Gradients -->
+    <!-- Degradado del botón JUGAR: morado #A855F7 → #7C3AED -->
+    <LinearGradientBrush x:Key="PlayGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FFA855F7" Offset="0" />
+        <GradientStop Color="#FF7C3AED" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Degradado de progreso: morado → cian -->
+    <LinearGradientBrush x:Key="ProgressGradientBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FFA855F7" Offset="0" />
+        <GradientStop Color="#FF22D3EE" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Gradiente principal anterior (compatibilidad) -->
     <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="{StaticResource AccentPrimaryColor}" Offset="0" />
         <GradientStop Color="{StaticResource AccentSecondaryColor}" Offset="1" />
     </LinearGradientBrush>
 
+    <!-- Gradiente violeta → rosa (acento principal de MineMount) -->
+    <LinearGradientBrush x:Key="BrandGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource AccentPrimaryColor}" Offset="0" />
+        <GradientStop Color="{StaticResource RosePrimaryColor}" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Scrim de legibilidad: ~85% negro abajo → ~15% arriba -->
+    <LinearGradientBrush x:Key="BackgroundScrimBrush" StartPoint="0,1" EndPoint="0,0">
+        <GradientStop Color="#D9000000" Offset="0" />
+        <GradientStop Color="#A6000000" Offset="0.35" />
+        <GradientStop Color="#59000000" Offset="0.65" />
+        <GradientStop Color="#26000000" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Tinte morado sutil de marca sobre el fondo -->
+    <SolidColorBrush x:Key="BrandTintBrush" Color="{StaticResource AccentTintColor}" />
+
     <LinearGradientBrush x:Key="BackgroundGradientBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="{StaticResource BackgroundPrimaryColor}" Offset="0" />
         <GradientStop Color="{StaticResource BackgroundSecondaryColor}" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Placeholder de thumbnails: degradado morado (nunca gris vacío) -->
+    <LinearGradientBrush x:Key="ThumbFallbackBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FF3B1D63" Offset="0" />
+        <GradientStop Color="#FF7C3AED" Offset="0.55" />
+        <GradientStop Color="#FF1B1033" Offset="1" />
     </LinearGradientBrush>
 
     <RadialGradientBrush x:Key="GlowGradientBrush" Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5">

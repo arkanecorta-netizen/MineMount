@@ -16,8 +16,16 @@ public class LauncherSettings
     public bool EnableSounds { get; set; } = true;
     public bool MinimizeOnLaunch { get; set; } = false;
     public string NewsFeedUrl { get; set; } = string.Empty;
+    public string UserName { get; set; } = "Jugador";
     public string Theme { get; set; } = "Dark";
     public string Language { get; set; } = "es-ES";
+
+    // Fondo animado: "Auto" (rotación), "Fijo" o "Desactivado" (PCs flojas)
+    public string BackgroundMode { get; set; } = "Auto";
+    public int SelectedBackground { get; set; } = 0;
+
+    // Detalles que le dan vida
+    public bool EnableParticles { get; set; } = true;
 }
 
 public class UserInfo

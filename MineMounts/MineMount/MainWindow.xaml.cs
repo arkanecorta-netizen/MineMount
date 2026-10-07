@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using MineMount.Services;
 using MineMount.ViewModels;
 
 namespace MineMount;
@@ -15,15 +16,64 @@ public partial class MainWindow : Window
     private const int WM_GETMINMAXINFO = 0x0024;
     private const int MONITOR_DEFAULTTONEAREST = 2;
 
+    private MainViewModel? _viewModel;
+
     public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
+        _viewModel = viewModel;
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
         StateChanged += OnStateChanged;
         SizeChanged += OnSizeChanged;
         SourceInitialized += OnSourceInitialized;
+        Activated += (_, _) => SetWindowActive(true);
+        Deactivated += (_, _) => SetWindowActive(false);
+
+        // Sonido de click suave en botones (desactivable desde Configuración)
+        PreviewMouseLeftButtonDown += OnPreviewClick;
+
+        Loaded += (_, _) =>
+        {
+            ApplyAppearance();
+            FadeInCurrentPage();
+        };
+
         UpdateWindowShape();
+    }
+
+    private void SetWindowActive(bool active)
+    {
+        if (_viewModel != null) _viewModel.WindowActive = active;
+        Backdrop.IsPaused = !active;
+        ParticlesHost.SetActive(_viewModel?.ParticlesActive ?? false);
+    }
+
+    private void OnPreviewClick(object sender, MouseButtonEventArgs e)
+    {
+        DependencyObject? node = e.OriginalSource as DependencyObject;
+        while (node != null && node is not System.Windows.Controls.Button)
+            node = VisualTreeHelper.GetParent(node);
+
+        if (node is System.Windows.Controls.Button)
+        {
+            try
+            {
+                App.GetService<ISoundService>().PlayClick();
+            }
+            catch
+            {
+                // Sonido decorativo: nunca debe romper un click.
+            }
+        }
+    }
+
+    private void ApplyAppearance()
+    {
+        if (_viewModel == null) return;
+        Backdrop.Configure(_viewModel.BackgroundMode, _viewModel.SelectedBackground, _viewModel.EnableAnimations);
+        Backdrop.IsPaused = !_viewModel.WindowActive;
+        ParticlesHost.SetActive(_viewModel.ParticlesActive);
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -65,6 +115,16 @@ public partial class MainWindow : Window
         {
             FadeInCurrentPage();
         }
+        else if (e.PropertyName == nameof(MainViewModel.BackgroundMode)
+            || e.PropertyName == nameof(MainViewModel.SelectedBackground)
+            || e.PropertyName == nameof(MainViewModel.EnableAnimations))
+        {
+            ApplyAppearance();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.ParticlesActive))
+        {
+            ParticlesHost.SetActive(_viewModel?.ParticlesActive ?? false);
+        }
     }
 
     private void OnStateChanged(object? sender, EventArgs e)
@@ -104,16 +164,26 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Entrada escalonada al cambiar de pestaña: fade + slide de 12px (GPU).
+    /// </summary>
     private void FadeInCurrentPage()
     {
         if (PageHost == null) return;
 
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var duration = TimeSpan.FromMilliseconds(250);
+
         PageHost.Opacity = 0;
-        var animation = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200))
+        PageHost.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
+
+        if (PageSlide != null)
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        PageHost.BeginAnimation(UIElement.OpacityProperty, animation);
+            PageSlide.Y = 12;
+            PageSlide.BeginAnimation(
+                System.Windows.Media.TranslateTransform.YProperty,
+                new DoubleAnimation(12, 0, duration) { EasingFunction = ease });
+        }
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

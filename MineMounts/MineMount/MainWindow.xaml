@@ -8,8 +8,8 @@
         xmlns:views="clr-namespace:MineMount.Views"
         mc:Ignorable="d"
         Title="MineMount"
-        Height="720" Width="1280"
-        MinHeight="600" MinWidth="900"
+        Height="760" Width="1280"
+        MinHeight="620" MinWidth="960"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -39,316 +39,491 @@
     </Window.Resources>
 
     <Border x:Name="RootBorder"
-            Background="{StaticResource BackgroundPrimaryBrush}"
+            Background="{StaticResource BaseBackgroundBrush}"
             CornerRadius="12"
-            BorderBrush="{StaticResource BorderPrimaryBrush}"
+            BorderBrush="{StaticResource GlassBorderBrush}"
             BorderThickness="1">
         <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="240" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+            <!-- Fondo inmersivo a pantalla completa (offline, con fallback sólido) -->
+            <views:AnimatedBackground x:Name="Backdrop" />
 
-            <!-- Sidebar -->
-            <Border x:Name="SidebarBorder"
-                    Grid.Column="0"
-                    Background="{StaticResource BackgroundSecondaryBrush}"
-                    CornerRadius="12,0,0,12"
-                    BorderBrush="{StaticResource BorderPrimaryBrush}"
-                    BorderThickness="0,0,1,0">
-                <Grid>
+            <!-- Partículas sutiles (desactivables) -->
+            <views:ParticlesCanvas x:Name="ParticlesHost"
+                                   Visibility="{Binding ParticlesActive, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- ============ SIDEBAR translúcida ============ -->
+                <Border x:Name="SidebarBorder"
+                        Grid.Column="0"
+                        Background="{StaticResource GlassSidebarBrush}"
+                        CornerRadius="12,0,0,12"
+                        BorderBrush="{StaticResource GlassBorderBrush}"
+                        BorderThickness="0,0,1,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Logo -->
+                        <StackPanel Grid.Row="0"
+                                    Orientation="Horizontal"
+                                    Margin="20,22,16,28">
+                            <ContentControl Content="{StaticResource IconLogo}"
+                                            Width="30" Height="30"
+                                            VerticalAlignment="Center" />
+                            <TextBlock Text="MINEMOUNT"
+                                       Style="{StaticResource TextBlock.Logo}"
+                                       FontSize="18"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0">
+                                <TextBlock.Effect>
+                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="#CC000000" Opacity="0.7" />
+                                </TextBlock.Effect>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <!-- Navegación -->
+                        <StackPanel Grid.Row="1" Margin="10,0">
+                            <Button Content="Inicio"
+                                    Command="{Binding NavigateHomeCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Nav}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedNavTag}" Value="Home">
+                                                <Setter Property="local:NavHelper.Selected" Value="1" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <Button.ContentTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <ContentControl Content="{StaticResource IconHome}"
+                                                            Width="20" Height="20"
+                                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                            <TextBlock Text="{Binding}"
+                                                       Margin="12,0,0,0"
+                                                       FontSize="14"
+                                                       FontWeight="Medium" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Button.ContentTemplate>
+                            </Button>
+
+                            <Button Content="Series"
+                                    Command="{Binding NavigateSeriesCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Nav}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedNavTag}" Value="Series">
+                                                <Setter Property="local:NavHelper.Selected" Value="1" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <Button.ContentTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <ContentControl Content="{StaticResource IconSeries}"
+                                                            Width="20" Height="20"
+                                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                            <TextBlock Text="{Binding}"
+                                                       Margin="12,0,0,0"
+                                                       FontSize="14"
+                                                       FontWeight="Medium" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Button.ContentTemplate>
+                            </Button>
+
+                            <Button Content="Configuración"
+                                    Command="{Binding NavigateSettingsCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Nav}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedNavTag}" Value="Settings">
+                                                <Setter Property="local:NavHelper.Selected" Value="1" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <Button.ContentTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <ContentControl Content="{StaticResource IconSettings}"
+                                                            Width="20" Height="20"
+                                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                            <TextBlock Text="{Binding}"
+                                                       Margin="12,0,0,0"
+                                                       FontSize="14"
+                                                       FontWeight="Medium" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </Button.ContentTemplate>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Perfil con skin de Minecraft -->
+                        <Border Grid.Row="2"
+                                Background="{StaticResource GlassCardBrush}"
+                                BorderBrush="{StaticResource GlassBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="10"
+                                Margin="10,0,10,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid Grid.Column="0" Width="38" Height="38">
+                                    <!-- Fallback: inicial -->
+                                    <Border CornerRadius="19"
+                                            Background="{StaticResource PlayGradientBrush}">
+                                        <TextBlock Text="{Binding UserName, Converter={StaticResource FirstLetterConverter}}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontWeight="Bold"
+                                                   FontSize="16"
+                                                   Foreground="White" />
+                                    </Border>
+                                    <!-- Skin (cabeza 3D vía Minotar; si falla, se ve la inicial) -->
+                                    <Border CornerRadius="19" ClipToBounds="True">
+                                        <Image Source="{Binding AvatarUrl}"
+                                               Stretch="UniformToFill"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                    </Border>
+                                </Grid>
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Margin="10,0,0,0">
+                                    <TextBlock Text="{Binding UserName}"
+                                               FontWeight="SemiBold"
+                                               FontSize="13"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <Ellipse Width="7" Height="7"
+                                                 Fill="{StaticResource CyanPrimaryBrush}"
+                                                 VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   Style="{StaticResource TextBlock.Muted}"
+                                                   FontSize="10"
+                                                   Margin="6,0,0,0"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- ============ CONTENIDO ============ -->
+                <Grid Grid.Column="1">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <!-- Logo -->
-                    <StackPanel Grid.Row="0"
-                                Orientation="Horizontal"
-                                Margin="24,24,24,32">
-                        <ContentControl Content="{StaticResource IconLogo}"
-                                        Width="32" Height="32"
-                                        VerticalAlignment="Center" />
-                        <TextBlock Text="MINEMOUNT"
-                                   Style="{StaticResource TextBlock.Logo}"
-                                   FontSize="20"
-                                   VerticalAlignment="Center"
-                                   Margin="12,0,0,0" />
-                    </StackPanel>
-
-                    <!-- Navigation -->
-                    <StackPanel Grid.Row="1" Margin="12,0">
-                        <Button Content="Inicio"
-                                Command="{Binding NavigateHomeCommand}">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource Button.Nav}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SelectedNavTag}" Value="Home">
-                                            <Setter Property="local:NavHelper.Selected" Value="1" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                            <Button.ContentTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
-                                        <ContentControl Content="{StaticResource IconHome}"
-                                                        Width="20" Height="20"
-                                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                        <TextBlock Text="{Binding}"
-                                                   Margin="12,0,0,0"
-                                                   FontSize="14"
-                                                   FontWeight="Medium" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </Button.ContentTemplate>
-                        </Button>
-
-                        <Button Content="Series"
-                                Command="{Binding NavigateSeriesCommand}">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource Button.Nav}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SelectedNavTag}" Value="Series">
-                                            <Setter Property="local:NavHelper.Selected" Value="1" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                            <Button.ContentTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
-                                        <ContentControl Content="{StaticResource IconSeries}"
-                                                        Width="20" Height="20"
-                                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                        <TextBlock Text="{Binding}"
-                                                   Margin="12,0,0,0"
-                                                   FontSize="14"
-                                                   FontWeight="Medium" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </Button.ContentTemplate>
-                        </Button>
-
-                        <Button Content="Configuración"
-                                Command="{Binding NavigateSettingsCommand}">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource Button.Nav}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SelectedNavTag}" Value="Settings">
-                                            <Setter Property="local:NavHelper.Selected" Value="1" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                            <Button.ContentTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
-                                        <ContentControl Content="{StaticResource IconSettings}"
-                                                        Width="20" Height="20"
-                                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                        <TextBlock Text="{Binding}"
-                                                   Margin="12,0,0,0"
-                                                   FontSize="14"
-                                                   FontWeight="Medium" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </Button.ContentTemplate>
-                        </Button>
-                    </StackPanel>
-
-                    <!-- User Info -->
-                    <Border Grid.Row="2"
-                            Background="{StaticResource BackgroundTertiaryBrush}"
-                            CornerRadius="8"
-                            Padding="12"
-                            Margin="12,0,12,16">
+                    <!-- Barra de título -->
+                    <Border Grid.Row="0"
+                            Background="Transparent"
+                            Height="48"
+                            MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0"
-                                    Width="36" Height="36"
-                                    CornerRadius="18"
-                                    Background="{StaticResource AccentPrimaryBrush}">
-                                <TextBlock Text="{Binding UserName, Converter={StaticResource FirstLetterConverter}}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontWeight="Bold"
-                                           FontSize="16"
-                                           Foreground="White" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
+
+                            <StackPanel Grid.Column="0"
+                                        Orientation="Horizontal"
                                         VerticalAlignment="Center"
-                                        Margin="10,0,0,0">
-                                <TextBlock Text="{Binding UserName}"
-                                           FontWeight="SemiBold"
-                                           FontSize="13"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding StatusText}"
-                                           Style="{StaticResource TextBlock.Muted}"
-                                           FontSize="10" />
+                                        Margin="24,0,0,0">
+                                <TextBlock Text="{Binding WindowTitle}"
+                                           VerticalAlignment="Center"
+                                           FontSize="12"
+                                           Foreground="{StaticResource ForegroundMutedBrush}">
+                                    <TextBlock.Effect>
+                                        <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#CC000000" Opacity="0.8" />
+                                    </TextBlock.Effect>
+                                </TextBlock>
+                                <Border VerticalAlignment="Center"
+                                        Margin="10,0,0,0"
+                                        Background="{StaticResource GlassCardBrush}"
+                                        BorderBrush="{StaticResource GlassBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="9999"
+                                        Padding="9,3">
+                                    <TextBlock Text="{Binding Version}"
+                                               FontSize="10"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource ForegroundSecondaryBrush}" />
+                                </Border>
                             </StackPanel>
+
+                            <Grid Grid.Column="1" VerticalAlignment="Center">
+                                <Button Content="ACTUALIZAR"
+                                        Command="{Binding UpdateNowCommand}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Padding="14,5"
+                                        FontSize="10"
+                                        FontWeight="SemiBold">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding HasUpdates}" Value="True" />
+                                                        <Condition Binding="{Binding IsDownloading}" Value="False" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsDownloading}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <ProgressBar Minimum="0"
+                                                 Maximum="100"
+                                                 Value="{Binding UpdateProgress, Mode=OneWay}"
+                                                 Width="160"
+                                                 Height="6"
+                                                 Style="{StaticResource ProgressBar.Glow}" />
+                                    <TextBlock Text="{Binding UpdateStatus}"
+                                               Margin="10,0,0,0"
+                                               VerticalAlignment="Center"
+                                               FontSize="11"
+                                               Foreground="{StaticResource ForegroundSecondaryBrush}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Grid.Column="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Button Grid.Column="0"
+                                        Command="{Binding MinimizeCommand}"
+                                        Content="{StaticResource IconMinimize}"
+                                        AutomationProperties.Name="Minimizar"
+                                        ToolTip="Minimizar">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource WindowControlButton}" />
+                                    </Button.Style>
+                                </Button>
+
+                                <Button Grid.Column="1"
+                                        Command="{Binding MaximizeRestoreCommand}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
+                                            <Setter Property="Content" Value="{StaticResource IconMaximize}" />
+                                            <Setter Property="ToolTip" Value="Maximizar" />
+                                            <Setter Property="AutomationProperties.Name" Value="Maximizar" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMaximized}" Value="True">
+                                                    <Setter Property="Content" Value="{StaticResource IconRestore}" />
+                                                    <Setter Property="ToolTip" Value="Restaurar" />
+                                                    <Setter Property="AutomationProperties.Name" Value="Restaurar" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+
+                                <Button Grid.Column="2"
+                                        Command="{Binding CloseCommand}"
+                                        Content="{StaticResource IconClose}"
+                                        AutomationProperties.Name="Cerrar"
+                                        ToolTip="Cerrar">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource WindowCloseButton}" />
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
                         </Grid>
                     </Border>
-                </Grid>
-            </Border>
 
-            <!-- Main Content -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+                    <!-- Página actual (fade + slide de 12px al cambiar) -->
+                    <ContentControl x:Name="PageHost"
+                                    Grid.Row="1"
+                                    Content="{Binding CurrentPageViewModel}"
+                                    ClipToBounds="True">
+                        <ContentControl.RenderTransform>
+                            <TranslateTransform x:Name="PageSlide" X="0" Y="0" />
+                        </ContentControl.RenderTransform>
+                    </ContentControl>
 
-                <!-- Title Bar -->
-                <Border Grid.Row="0"
-                        Background="Transparent"
-                        Height="48"
-                        MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0"
-                                    Orientation="Horizontal"
-                                    VerticalAlignment="Center"
-                                    Margin="24,0,0,0">
-                            <TextBlock Text="{Binding WindowTitle}"
-                                       VerticalAlignment="Center"
-                                       FontSize="12"
-                                       Foreground="{StaticResource ForegroundMutedBrush}" />
-                            <Border VerticalAlignment="Center"
-                                    Margin="10,0,0,0"
-                                    Background="{StaticResource BackgroundTertiaryBrush}"
-                                    CornerRadius="9999"
-                                    Padding="9,3">
-                                <TextBlock Text="{Binding Version}"
-                                           FontSize="10"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource ForegroundSecondaryBrush}" />
-                            </Border>
-                        </StackPanel>
-
-                        <Grid Grid.Column="1"
-                              VerticalAlignment="Center">
-                            <!-- Botón ACTUALIZAR cuando hay versión nueva -->
-                            <Button Content="ACTUALIZAR"
-                                    Command="{Binding UpdateNowCommand}"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Padding="14,5"
-                                    FontSize="10"
-                                    FontWeight="SemiBold">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <MultiDataTrigger>
-                                                <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding HasUpdates}" Value="True" />
-                                                    <Condition Binding="{Binding IsDownloading}" Value="False" />
-                                                </MultiDataTrigger.Conditions>
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </MultiDataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-
-                            <!-- Progreso real de descarga -->
-                            <StackPanel Orientation="Horizontal"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center">
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsDownloading}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                                <ProgressBar Minimum="0"
-                                             Maximum="100"
-                                             Value="{Binding UpdateProgress, Mode=OneWay}"
-                                             Width="160"
-                                             Height="5"
-                                             Style="{StaticResource ProgressBar.Base}" />
-                                <TextBlock Text="{Binding UpdateStatus}"
-                                           Margin="10,0,0,0"
-                                           VerticalAlignment="Center"
-                                           FontSize="11"
-                                           Foreground="{StaticResource ForegroundSecondaryBrush}" />
-                            </StackPanel>
-                        </Grid>
-
-                        <Grid Grid.Column="2">
+                    <!-- ============ BARRA INFERIOR fija (launcher oficial) ============ -->
+                    <Border Grid.Row="2"
+                            Background="{StaticResource GlassSidebarBrush}"
+                            BorderBrush="{StaticResource GlassBorderBrush}"
+                            BorderThickness="0,1,0,0"
+                            Padding="20,12,20,14">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <Button Grid.Column="0"
-                                    Command="{Binding MinimizeCommand}"
-                                    Content="{StaticResource IconMinimize}"
-                                    AutomationProperties.Name="Minimizar"
-                                    ToolTip="Minimizar">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource WindowControlButton}" />
-                                </Button.Style>
-                            </Button>
+                            <!-- JUGAR enorme + estado debajo -->
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <Button Style="{StaticResource Button.Play}"
+                                        Command="{Binding PlayPrimaryCommand}"
+                                        IsEnabled="{Binding CanPlayPrimary}"
+                                        AutomationProperties.Name="Jugar">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <ContentControl Content="{StaticResource IconPlaySolid}"
+                                                        Width="26" Height="26"
+                                                        VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding PlayButtonText}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="12,0,0,0"
+                                                   FontFamily="{StaticResource FontFamilyDisplay}"
+                                                   FontWeight="Bold"
+                                                   FontSize="22"
+                                                   Foreground="White" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Text="{Binding PlayStatusDetail}"
+                                           Style="{StaticResource TextBlock.Caption}"
+                                           Margin="2,8,0,0"
+                                           MaxWidth="240"
+                                           TextTrimming="CharacterEllipsis">
+                                    <TextBlock.Effect>
+                                        <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#CC000000" Opacity="0.8" />
+                                    </TextBlock.Effect>
+                                </TextBlock>
+                            </StackPanel>
 
-                            <Button Grid.Column="1"
-                                    Command="{Binding MaximizeRestoreCommand}">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
-                                        <Setter Property="Content" Value="{StaticResource IconMaximize}" />
-                                        <Setter Property="ToolTip" Value="Maximizar" />
-                                        <Setter Property="AutomationProperties.Name" Value="Maximizar" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsMaximized}" Value="True">
-                                                <Setter Property="Content" Value="{StaticResource IconRestore}" />
-                                                <Setter Property="ToolTip" Value="Restaurar" />
-                                                <Setter Property="AutomationProperties.Name" Value="Restaurar" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
+                            <!-- Selector de serie / versión -->
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Margin="14,0,0,26">
+                                <TextBlock Text="SERIE"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource ForegroundMutedBrush}"
+                                           Margin="2,0,0,4" />
+                                <ComboBox ItemsSource="{Binding AvailableSeries}"
+                                          SelectedItem="{Binding SelectedPlaySeries, Mode=TwoWay}"
+                                          Width="220"
+                                          Style="{StaticResource ComboBox.Base}"
+                                          AutomationProperties.Name="Serie y versión">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="2">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="13" />
+                                                <TextBlock FontSize="11"
+                                                           Foreground="{StaticResource ForegroundMutedBrush}"
+                                                           TextTrimming="CharacterEllipsis">
+                                                    <Run Text="{Binding Definition.MinecraftVersion, Mode=OneWay}" />
+                                                    <Run Text=" · " />
+                                                    <Run Text="{Binding Definition.Loader, Mode=OneWay}" />
+                                                    <Run Text=" · v" />
+                                                    <Run Text="{Binding Version, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
 
-                            <Button Grid.Column="2"
-                                    Command="{Binding CloseCommand}"
-                                    Content="{StaticResource IconClose}"
-                                    AutomationProperties.Name="Cerrar"
-                                    ToolTip="Cerrar">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource WindowCloseButton}" />
-                                </Button.Style>
-                            </Button>
+                            <!-- Progreso de descarga / instalación -->
+                            <StackPanel Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        Margin="20,0"
+                                        Visibility="{Binding IsPlayBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <ProgressBar Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding PlayProgress, Mode=OneWay}"
+                                             Height="8"
+                                             Style="{StaticResource ProgressBar.Glow}" />
+                                <TextBlock Text="{Binding PlayProgressText}"
+                                           Style="{StaticResource TextBlock.Caption}"
+                                           Margin="0,6,0,0"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+
+                            <!-- Promos a la derecha -->
+                            <ScrollViewer Grid.Column="3"
+                                          VerticalAlignment="Center"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding PromoItems}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource PromoCard}"
+                                                    Width="158"
+                                                    Margin="0,0,8,0">
+                                                <Border.InputBindings>
+                                                    <MouseBinding MouseAction="LeftClick"
+                                                                  Command="{Binding DataContext.PromoCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                  CommandParameter="{Binding Target}" />
+                                                </Border.InputBindings>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ContentControl Content="{Binding IconKey, Converter={StaticResource PromoIconConverter}}"
+                                                                    Width="22" Height="22"
+                                                                    VerticalAlignment="Center" />
+                                                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Title}"
+                                                                   FontWeight="SemiBold"
+                                                                   FontSize="12" />
+                                                        <TextBlock Text="{Binding Description}"
+                                                                   Style="{StaticResource TextBlock.Caption}"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   MaxWidth="112" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </Grid>
-                    </Grid>
-                </Border>
-
-                <!-- Content Area -->
-                <ContentControl x:Name="PageHost"
-                                Grid.Row="1"
-                                Content="{Binding CurrentPageViewModel}" />
+                    </Border>
+                </Grid>
             </Grid>
 
-            <!-- Notifications (esquina inferior derecha) -->
-            <views:NotificationHost Grid.Column="1"
-                                    DataContext="{Binding Notifications}"
+            <!-- Notificaciones -->
+            <views:NotificationHost DataContext="{Binding Notifications}"
                                     VerticalAlignment="Bottom"
                                     HorizontalAlignment="Right"
-                                    Margin="0,0,24,24"
+                                    Margin="0,0,24,120"
                                     Width="340" />
         </Grid>
     </Border>

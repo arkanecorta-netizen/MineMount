@@ -1,0 +1,200 @@
+using System;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+
+namespace MineMount.Views;
+
+/// <summary>
+/// Fondo a pantalla completa con rotación automática y crossfade suave:
+/// ~8s por imagen, transición de 1.5s, Ken Burns (zoom 1.0 → 1.08).
+/// Modos: "Auto" (rotación), "Fijo" (una imagen, sin animación) y
+/// "Desactivado" (color sólido, para PCs flojas). Se pausa con IsPaused
+/// (la ventana pierde el foco) y respeta EnableAnimations.
+/// Todo el catálogo es local (Assets/Backgrounds) para funcionar offline,
+/// con fallback a color sólido si una imagen falla.
+/// </summary>
+public partial class AnimatedBackground : UserControl
+{
+    private static readonly TimeSpan HoldTime = TimeSpan.FromSeconds(8);
+    private static readonly Duration Crossfade = new(TimeSpan.FromSeconds(1.5));
+    private static readonly Duration KenBurns = new(TimeSpan.FromSeconds(8));
+
+    private readonly DispatcherTimer _timer;
+    private readonly Random _random = new();
+    private int _current = -1;
+    private bool _showingB;
+    private bool _isPaused;
+    private bool _animationsEnabled = true;
+    private string _mode = "Auto";
+    private int _fixedIndex;
+
+    public bool IsPaused
+    {
+        get => _isPaused;
+        set
+        {
+            _isPaused = value;
+            UpdateTimer();
+        }
+    }
+
+    public bool AnimationsEnabled
+    {
+        get => _animationsEnabled;
+        set
+        {
+            _animationsEnabled = value;
+            UpdateTimer();
+        }
+    }
+
+    public AnimatedBackground()
+    {
+        InitializeComponent();
+        _timer = new DispatcherTimer { Interval = HoldTime };
+        _timer.Tick += (_, _) => Advance();
+        Loaded += (_, _) => ApplyMode(initial: true);
+        Unloaded += (_, _) => _timer.Stop();
+    }
+
+    /// <summary>Configura el modo desde los ajustes (Auto/Fijo/Desactivado).</summary>
+    public void Configure(string mode, int fixedIndex, bool animationsEnabled)
+    {
+        _mode = string.IsNullOrWhiteSpace(mode) ? "Auto" : mode;
+        _fixedIndex = Math.Max(0, fixedIndex);
+        _animationsEnabled = animationsEnabled;
+        if (!IsLoaded) return;
+        ApplyMode(initial: false);
+    }
+
+    private void ApplyMode(bool initial)
+    {
+        var mode = (_mode ?? "Auto").Trim();
+
+        if (string.Equals(mode, "Desactivado", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(mode, "Off", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(mode, "Disabled", StringComparison.OrdinalIgnoreCase))
+        {
+            // PCs flojas: solo el color sólido, sin imágenes ni animaciones.
+            _timer.Stop();
+            ImageA.Source = null;
+            ImageB.Source = null;
+            ImageA.Opacity = 0;
+            ImageB.Opacity = 0;
+            return;
+        }
+
+        if (string.Equals(mode, "Fijo", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(mode, "Fixed", StringComparison.OrdinalIgnoreCase))
+        {
+            _timer.Stop();
+            ShowFixed(_fixedIndex);
+            return;
+        }
+
+        // Rotación automática
+        if (initial || _current < 0)
+        {
+            _current = _random.Next(Services.BackgroundCatalog.Items.Count);
+            SetImage(ImageA, _current);
+            ImageA.Opacity = 1;
+            ImageB.Opacity = 0;
+            _showingB = false;
+            if (_animationsEnabled) StartKenBurns(ZoomA);
+        }
+        UpdateTimer();
+    }
+
+    private void UpdateTimer()
+    {
+        var auto = !string.Equals(_mode, "Desactivado", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(_mode, "Fijo", StringComparison.OrdinalIgnoreCase);
+        _timer.IsEnabled = auto && !_isPaused && _animationsEnabled && IsLoaded;
+        if (!auto || _isPaused || !_animationsEnabled) return;
+        if (!_timer.IsEnabled) _timer.Start();
+    }
+
+    private void ShowFixed(int index)
+    {
+        var uri = Services.BackgroundCatalog.UriAt(index);
+        _current = index;
+        _showingB = false;
+        SetImage(ImageA, index);
+        ImageB.Opacity = 0;
+        ImageA.Opacity = 1;
+        // Sin animación en modo fijo: zoom leve estático (barato, sin storyboard).
+        ZoomA.ScaleX = 1.04;
+        ZoomA.ScaleY = 1.04;
+        _ = uri;
+    }
+
+    private void Advance()
+    {
+        if (_isPaused || !_animationsEnabled) return;
+
+        var next = (_current + 1) % Services.BackgroundCatalog.Items.Count;
+        _current = next;
+
+        var fadeIn = _showingB ? ImageA : ImageB;
+        var fadeOut = _showingB ? ImageB : ImageA;
+        var zoomIn = _showingB ? ZoomA : ZoomB;
+
+        SetImage(fadeIn, next);
+        if (fadeIn.Source == null)
+        {
+            // Falló la imagen: se mantiene la actual (fallback a color sólido detrás).
+            return;
+        }
+
+        var fade = new DoubleAnimation(0, 1, Crossfade)
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
+        };
+        var hide = new DoubleAnimation(1, 0, Crossfade)
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
+        };
+        fadeIn.BeginAnimation(OpacityProperty, fade);
+        fadeOut.BeginAnimation(OpacityProperty, hide);
+        StartKenBurns(zoomIn);
+
+        _showingB = !_showingB;
+    }
+
+    private void StartKenBurns(System.Windows.Media.ScaleTransform zoom)
+    {
+        if (!_animationsEnabled) return;
+        zoom.ScaleX = 1.0;
+        zoom.ScaleY = 1.0;
+        var easing = new QuadraticEase { EasingMode = EasingMode.EaseInOut };
+        zoom.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(1.0, 1.08, KenBurns) { EasingFunction = easing });
+        zoom.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(1.0, 1.08, KenBurns) { EasingFunction = easing });
+    }
+
+    private static void SetImage(Image target, int index)
+    {
+        try
+        {
+            var uri = Services.BackgroundCatalog.UriAt(index);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.UriSource = uri;
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.DecodePixelWidth = 1920; // limita memoria/GPU en 4K
+            bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+            bitmap.EndInit();
+            if (bitmap.CanFreeze) bitmap.Freeze();
+            target.Source = bitmap;
+        }
+        catch
+        {
+            // Fallback: se deja el color sólido de fondo.
+            target.Source = null;
+        }
+    }
+}

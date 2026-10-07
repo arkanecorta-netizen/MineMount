@@ -6,7 +6,40 @@
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="800">
 
-    <Grid Margin="24">
+    <UserControl.Resources>
+        <Style x:Key="BackgroundThumb" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="ThumbBorder"
+                                Width="128" Height="72"
+                                CornerRadius="10"
+                                ClipToBounds="True"
+                                BorderBrush="{StaticResource GlassBorderBrush}"
+                                BorderThickness="1"
+                                Background="{StaticResource ThumbFallbackBrush}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ThumbBorder" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ThumbBorder" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
+                                <Setter TargetName="ThumbBorder" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="ThumbBorder" Property="Effect" Value="{StaticResource ShadowGlow}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="28,16,28,20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -19,9 +52,9 @@
         <ScrollViewer Grid.Row="1"
                       Margin="0,16,0,0"
                       VerticalScrollBarVisibility="Auto">
-            <StackPanel>
+            <StackPanel MaxWidth="860">
 
-                <!-- Account Section -->
+                <!-- Cuenta -->
                 <Border Style="{StaticResource Card}"
                         Margin="0,0,0,16">
                     <StackPanel>
@@ -77,7 +110,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Game Settings -->
+                <!-- Juego -->
                 <Border Style="{StaticResource Card}"
                         Margin="0,0,0,16">
                     <StackPanel>
@@ -133,7 +166,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Series Settings -->
+                <!-- Series -->
                 <Border Style="{StaticResource Card}"
                         Margin="0,0,0,16">
                     <StackPanel>
@@ -148,6 +181,7 @@
                                  Style="{StaticResource TextBox.Base}"
                                  Text="{Binding SeriesInstallPath}"
                                  VerticalContentAlignment="Center"
+                                 HorizontalAlignment="Left"
                                  AutomationProperties.Name="Carpeta de instalación de series" />
                         <TextBlock Text="Vacío usa la predeterminada: %APPDATA%\MineMount\Series"
                                    Style="{StaticResource TextBlock.Muted}"
@@ -156,27 +190,97 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Launcher Settings -->
+                <!-- Fondo -->
                 <Border Style="{StaticResource Card}"
                         Margin="0,0,0,16">
                     <StackPanel>
-                        <TextBlock Text="LAUNCHER"
+                        <TextBlock Text="FONDO"
                                    Style="{StaticResource TextBlock.Heading}"
                                    Margin="0,0,0,12" />
 
-                        <CheckBox Content="Actualizaciones automáticas"
-                                  Style="{StaticResource CheckBox.Base}"
-                                  IsChecked="{Binding AutoUpdate}"
-                                  Margin="0,0,0,8" />
-                        <CheckBox Content="Mostrar noticias"
-                                  Style="{StaticResource CheckBox.Base}"
-                                  IsChecked="{Binding ShowNews}"
-                                  Margin="0,0,0,8" />
+                        <TextBlock Text="Modo de fondo"
+                                   Style="{StaticResource TextBlock.Secondary}"
+                                   Margin="0,0,0,4" />
+                        <ComboBox Width="260"
+                                  Style="{StaticResource ComboBox.Base}"
+                                  SelectedValuePath="Tag"
+                                  SelectedValue="{Binding BackgroundMode, Mode=TwoWay}"
+                                  AutomationProperties.Name="Modo de fondo"
+                                  HorizontalAlignment="Left">
+                            <ComboBoxItem Content="Rotación automática (8 s)" Tag="Auto" />
+                            <ComboBoxItem Content="Fondo fijo" Tag="Fijo" />
+                            <ComboBoxItem Content="Desactivado (PCs flojas)" Tag="Desactivado" />
+                        </ComboBox>
+                        <TextBlock Text="Las imágenes vienen incluidas en el launcher: funciona sin internet. Si alguna falla, se usa el color base #0B0B0F."
+                                   Style="{StaticResource TextBlock.Muted}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,6,0,0" />
+
+                        <StackPanel Margin="0,14,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding BackgroundMode}" Value="Fijo">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Elegí el fondo fijo"
+                                       Style="{StaticResource TextBlock.Secondary}"
+                                       Margin="0,0,0,8" />
+                            <ListBox SelectedIndex="{Binding SelectedBackground, Mode=TwoWay}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ItemContainerStyle="{StaticResource BackgroundThumb}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     AutomationProperties.Name="Fondo fijo">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBoxItem>
+                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg1.png" Stretch="UniformToFill" />
+                                </ListBoxItem>
+                                <ListBoxItem>
+                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg2.jpg" Stretch="UniformToFill" />
+                                </ListBoxItem>
+                                <ListBoxItem>
+                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg3.jpg" Stretch="UniformToFill" />
+                                </ListBoxItem>
+                                <ListBoxItem>
+                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg4.jpg" Stretch="UniformToFill" />
+                                </ListBoxItem>
+                                <ListBoxItem>
+                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg5.jpg" Stretch="UniformToFill" />
+                                </ListBoxItem>
+                                <ListBoxItem>
+                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg6.jpg" Stretch="UniformToFill" />
+                                </ListBoxItem>
+                            </ListBox>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Apariencia -->
+                <Border Style="{StaticResource Card}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="APARIENCIA"
+                                   Style="{StaticResource TextBlock.Heading}"
+                                   Margin="0,0,0,12" />
+
                         <CheckBox Content="Habilitar animaciones"
                                   Style="{StaticResource CheckBox.Base}"
                                   IsChecked="{Binding EnableAnimations}"
                                   Margin="0,0,0,8" />
-                        <CheckBox Content="Habilitar sonidos"
+                        <CheckBox Content="Partículas flotantes (polvo morado)"
+                                  Style="{StaticResource CheckBox.Base}"
+                                  IsChecked="{Binding EnableParticles}"
+                                  Margin="0,0,0,8" />
+                        <CheckBox Content="Sonido de click en botones"
                                   Style="{StaticResource CheckBox.Base}"
                                   IsChecked="{Binding EnableSounds}"
                                   Margin="0,0,0,8" />
@@ -209,7 +313,26 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Profiles -->
+                <!-- Launcher -->
+                <Border Style="{StaticResource Card}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="LAUNCHER"
+                                   Style="{StaticResource TextBlock.Heading}"
+                                   Margin="0,0,0,12" />
+
+                        <CheckBox Content="Actualizaciones automáticas"
+                                  Style="{StaticResource CheckBox.Base}"
+                                  IsChecked="{Binding AutoUpdate}"
+                                  Margin="0,0,0,8" />
+                        <CheckBox Content="Mostrar noticias"
+                                  Style="{StaticResource CheckBox.Base}"
+                                  IsChecked="{Binding ShowNews}"
+                                  Margin="0,0,0,8" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Perfiles -->
                 <Border Style="{StaticResource Card}"
                         Margin="0,0,0,16">
                     <StackPanel>
@@ -223,10 +346,10 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Actions -->
+                <!-- Acciones -->
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Right"
-                            Margin="0,16,0,0">
+                            Margin="0,4,0,8">
                     <Button Content="Restablecer"
                             Style="{StaticResource Button.Secondary}"
                             Command="{Binding ResetSettingsCommand}"

@@ -2,12 +2,16 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
-    <!-- Font Families -->
-    <FontFamily x:Key="FontFamilyPrimary">Segoe UI Variable, Segoe UI, system-ui</FontFamily>
+    <!-- ============================================================
+         Tipografías MineMount (offline, empaquetadas en Assets/Fonts)
+         Display/logo: Rajdhani Bold · Texto: Inter · Fallbacks del sistema
+         ============================================================ -->
+    <FontFamily x:Key="FontFamilyDisplay">pack://application:,,,/Assets/Fonts/Rajdhani-Bold.ttf#Rajdhani, pack://application:,,,/Assets/Fonts/Rajdhani-SemiBold.ttf#Rajdhani, Segoe UI Variable Display, Segoe UI</FontFamily>
+    <FontFamily x:Key="FontFamilyDisplayMedium">pack://application:,,,/Assets/Fonts/Rajdhani-Medium.ttf#Rajdhani, Segoe UI Variable Display, Segoe UI</FontFamily>
+    <FontFamily x:Key="FontFamilyPrimary">pack://application:,,,/Assets/Fonts/Inter-Variable.ttf#Inter, Segoe UI Variable, Segoe UI, system-ui</FontFamily>
     <FontFamily x:Key="FontFamilyMonospace">Cascadia Code, Consolas, monospace</FontFamily>
-    <FontFamily x:Key="FontFamilyDisplay">Segoe UI Variable Display, Segoe UI, system-ui</FontFamily>
 
-    <!-- Font Sizes -->
+    <!-- Tamaños -->
     <sys:Double x:Key="FontSizeXS">11</sys:Double>
     <sys:Double x:Key="FontSizeSM">12</sys:Double>
     <sys:Double x:Key="FontSizeMD">14</sys:Double>
@@ -16,16 +20,17 @@
     <sys:Double x:Key="FontSize2XL">28</sys:Double>
     <sys:Double x:Key="FontSize3XL">36</sys:Double>
     <sys:Double x:Key="FontSize4XL">48</sys:Double>
+    <sys:Double x:Key="FontSizeHero">52</sys:Double>
     <sys:Double x:Key="FontSizeDisplay">72</sys:Double>
 
-    <!-- Font Weights -->
+    <!-- Pesos -->
     <FontWeight x:Key="FontWeightLight">300</FontWeight>
     <FontWeight x:Key="FontWeightNormal">400</FontWeight>
     <FontWeight x:Key="FontWeightMedium">500</FontWeight>
     <FontWeight x:Key="FontWeightSemiBold">600</FontWeight>
     <FontWeight x:Key="FontWeightBold">700</FontWeight>
 
-    <!-- Spacing -->
+    <!-- Espaciados -->
     <Thickness x:Key="SpacingXS">4</Thickness>
     <Thickness x:Key="SpacingSM">8</Thickness>
     <Thickness x:Key="SpacingMD">16</Thickness>
@@ -33,20 +38,23 @@
     <Thickness x:Key="SpacingXL">32</Thickness>
     <Thickness x:Key="Spacing2XL">48</Thickness>
 
-    <!-- Border Radius -->
+    <!-- Radios -->
     <CornerRadius x:Key="BorderRadiusSM">4</CornerRadius>
     <CornerRadius x:Key="BorderRadiusMD">8</CornerRadius>
     <CornerRadius x:Key="BorderRadiusLG">12</CornerRadius>
     <CornerRadius x:Key="BorderRadiusXL">16</CornerRadius>
     <CornerRadius x:Key="BorderRadiusFull">9999</CornerRadius>
 
-    <!-- Shadows -->
+    <!-- Sombras (GPU: DropShadowEffect con poco blur) -->
     <DropShadowEffect x:Key="ShadowSM" BlurRadius="4" ShadowDepth="1" Color="#FF000000" Opacity="0.3" Direction="270" />
     <DropShadowEffect x:Key="ShadowMD" BlurRadius="12" ShadowDepth="4" Color="#FF000000" Opacity="0.4" Direction="270" />
     <DropShadowEffect x:Key="ShadowLG" BlurRadius="24" ShadowDepth="8" Color="#FF000000" Opacity="0.5" Direction="270" />
-    <DropShadowEffect x:Key="ShadowGlow" BlurRadius="20" ShadowDepth="0" Color="#FFE53935" Opacity="0.4" />
+    <DropShadowEffect x:Key="ShadowGlow" BlurRadius="20" ShadowDepth="0" Color="#FFA855F7" Opacity="0.4" />
+    <DropShadowEffect x:Key="ShadowGlowPlay" BlurRadius="28" ShadowDepth="0" Color="#FFA855F7" Opacity="0.55" />
+    <DropShadowEffect x:Key="ShadowTextHero" BlurRadius="16" ShadowDepth="0" Color="#CC000000" Opacity="0.8" />
+    <DropShadowEffect x:Key="ShadowTextSoft" BlurRadius="8" ShadowDepth="2" Color="#CC000000" Opacity="0.7" Direction="270" />
 
-    <!-- Text Styles -->
+    <!-- Texto base -->
     <Style x:Key="TextBlock.Base" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyPrimary}" />
         <Setter Property="FontSize" Value="{StaticResource FontSizeMD}" />
@@ -72,7 +80,7 @@
     </Style>
 
     <Style x:Key="TextBlock.Accent" BasedOn="{StaticResource TextBlock.Base}" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{StaticResource AccentPrimaryBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource AccentLightBrush}" />
         <Setter Property="FontWeight" Value="{StaticResource FontWeightSemiBold}" />
     </Style>
 
@@ -96,6 +104,25 @@
         <Setter Property="Foreground" Value="{StaticResource ForegroundSecondaryBrush}" />
     </Style>
 
+    <!-- Hero tipográfico grande directamente sobre la imagen -->
+    <Style x:Key="TextBlock.Hero" BasedOn="{StaticResource TextBlock.Base}" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyDisplay}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeHero}" />
+        <Setter Property="FontWeight" Value="{StaticResource FontWeightBold}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="LineHeight" Value="54" />
+        <Setter Property="Effect" Value="{StaticResource ShadowTextHero}" />
+    </Style>
+
+    <!-- Eyebrow del hero: tracking amplio, mayúsculas -->
+    <Style x:Key="TextBlock.HeroEyebrow" BasedOn="{StaticResource TextBlock.Base}" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyPrimary}" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeSM}" />
+        <Setter Property="FontWeight" Value="{StaticResource FontWeightSemiBold}" />
+        <Setter Property="Foreground" Value="{StaticResource AccentLightBrush}" />
+        <Setter Property="Effect" Value="{StaticResource ShadowTextSoft}" />
+    </Style>
+
     <Style x:Key="TextBlock.Display" BasedOn="{StaticResource TextBlock.Base}" TargetType="TextBlock">
         <Setter Property="FontSize" Value="{StaticResource FontSizeDisplay}" />
         <Setter Property="FontWeight" Value="{StaticResource FontWeightLight}" />
@@ -116,7 +143,7 @@
         <Setter Property="Foreground" Value="{StaticResource ForegroundMutedBrush}" />
     </Style>
 
-    <!-- Base Control Styles -->
+    <!-- Controles base -->
     <Style x:Key="Control.Base" TargetType="Control">
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyPrimary}" />
         <Setter Property="FontSize" Value="{StaticResource FontSizeMD}" />
@@ -128,13 +155,15 @@
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
     </Style>
 
-    <!-- Animation Durations -->
+    <!-- Duraciones de animación -->
     <Duration x:Key="DurationFast">0:0:0.1</Duration>
     <Duration x:Key="DurationNormal">0:0:0.2</Duration>
     <Duration x:Key="DurationSlow">0:0:0.3</Duration>
     <Duration x:Key="DurationVerySlow">0:0:0.5</Duration>
+    <Duration x:Key="DurationCrossfade">0:0:1.5</Duration>
+    <Duration x:Key="DurationKenBurns">0:0:8</Duration>
 
-    <!-- Easing Functions -->
+    <!-- Easings -->
     <CubicEase x:Key="EaseStandard" EasingMode="EaseOut" />
     <QuadraticEase x:Key="EaseAccelerate" EasingMode="EaseIn" />
     <QuadraticEase x:Key="EaseDecelerate" EasingMode="EaseOut" />

@@ -150,11 +150,11 @@ public partial class SeriesDetailViewModel : ObservableObject
 
         StatusBrush = info.Status switch
         {
-            SeriesStatus.Installed => new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50)),
-            SeriesStatus.MissingFiles => new SolidColorBrush(Color.FromRgb(0xF4, 0x43, 0x36)),
-            SeriesStatus.UpdateAvailable => new SolidColorBrush(Color.FromRgb(0xFF, 0x98, 0x00)),
+            SeriesStatus.Installed => new SolidColorBrush(Color.FromRgb(0x22, 0xC5, 0x5E)),
+            SeriesStatus.MissingFiles => new SolidColorBrush(Color.FromRgb(0xF8, 0x71, 0x71)),
+            SeriesStatus.UpdateAvailable => new SolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24)),
             SeriesStatus.ComingSoon => new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80)),
-            _ => new SolidColorBrush(Color.FromRgb(0xB3, 0xB3, 0xB3))
+            _ => new SolidColorBrush(Color.FromRgb(0xD4, 0xD4, 0xD8))
         };
 
         IsNotInstalled = info.Status == SeriesStatus.NotInstalled;
@@ -188,7 +188,13 @@ public partial class SeriesDetailViewModel : ObservableObject
     {
         if (IsBusy || string.IsNullOrWhiteSpace(Id)) return;
 
-        var result = await _gameLauncher.LaunchAsync(Id);
+        var progress = new Progress<double>(p =>
+        {
+            ProgressPercent = p;
+            ProgressText = $"Preparando... {p:F0}%";
+        });
+
+        var result = await _gameLauncher.LaunchAsync(Id, progress);
         if (!result.Success && !string.IsNullOrEmpty(result.Message))
         {
             _notificationService.NotifyError("No se pudo iniciar", result.Message);

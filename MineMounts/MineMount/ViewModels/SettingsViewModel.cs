@@ -66,6 +66,16 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _language = "es-ES";
 
+    // Fondo animado: "Auto" (rotación) · "Fijo" · "Desactivado" (PCs flojas)
+    [ObservableProperty]
+    private string _backgroundMode = "Auto";
+
+    [ObservableProperty]
+    private int _selectedBackground;
+
+    [ObservableProperty]
+    private bool _enableParticles = true;
+
     [ObservableProperty]
     private string _launcherVersion = "1.0.0";
 
@@ -106,6 +116,9 @@ public partial class SettingsViewModel : ObservableObject
             EnableSounds = settings.EnableSounds;
             Theme = settings.Theme;
             Language = settings.Language;
+            BackgroundMode = string.IsNullOrWhiteSpace(settings.BackgroundMode) ? "Auto" : settings.BackgroundMode;
+            SelectedBackground = settings.SelectedBackground;
+            EnableParticles = settings.EnableParticles;
 
             IsLoggedIn = _authService.IsAuthenticated;
             if (IsLoggedIn)
@@ -155,7 +168,10 @@ public partial class SettingsViewModel : ObservableObject
                 EnableAnimations = EnableAnimations,
                 EnableSounds = EnableSounds,
                 Theme = Theme,
-                Language = Language
+                Language = Language,
+                BackgroundMode = BackgroundMode,
+                SelectedBackground = SelectedBackground,
+                EnableParticles = EnableParticles
             };
 
             await _settingsService.SaveSettingsAsync(settings);
@@ -307,6 +323,9 @@ public partial class SettingsViewModel : ObservableObject
         EnableSounds = true;
         Theme = "Dark";
         Language = "es-ES";
+        BackgroundMode = "Auto";
+        SelectedBackground = 0;
+        EnableParticles = true;
 
         StatusText = "Configuración restablecida";
     }

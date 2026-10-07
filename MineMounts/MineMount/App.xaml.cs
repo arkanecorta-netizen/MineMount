@@ -91,6 +91,9 @@ public partial class App : Application
         services.AddSingleton<IGameLauncherService, GameLauncherService>();
         services.AddSingleton<ITempCleanupService, TempCleanupService>();
         services.AddSingleton<IDiskSpaceService, DiskSpaceService>();
+        services.AddSingleton<IMinecraftInstallService, MinecraftInstallService>();
+        services.AddSingleton<IForgeInstallService, ForgeInstallService>();
+        services.AddSingleton<ISoundService, SoundService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();

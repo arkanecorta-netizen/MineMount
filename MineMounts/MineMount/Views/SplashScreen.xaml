@@ -10,71 +10,186 @@
         WindowStartupLocation="CenterScreen"
         FontFamily="{StaticResource FontFamilyPrimary}">
 
-    <Border Background="{StaticResource BackgroundSecondaryBrush}"
-            CornerRadius="12"
-            BorderBrush="{StaticResource BorderPrimaryBrush}"
-            BorderThickness="1">
-        <Grid Margin="36,32">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+    <Window.Triggers>
+        <!-- Logo: las capas se apilan al arrancar -->
+        <EventTrigger RoutedEvent="Window.Loaded">
+            <BeginStoryboard>
+                <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="LayerBack"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0" To="0.35" Duration="0:0:0.5" />
+                    <DoubleAnimation Storyboard.TargetName="LayerBackShift"
+                                     Storyboard.TargetProperty="Y"
+                                     From="-26" To="0" Duration="0:0:0.6">
+                        <DoubleAnimation.EasingFunction>
+                            <CubicEase EasingMode="EaseOut" />
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <DoubleAnimation Storyboard.TargetName="LayerMid"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0" To="0.6" Duration="0:0:0.5"
+                                     BeginTime="0:0:0.15" />
+                    <DoubleAnimation Storyboard.TargetName="LayerMidShift"
+                                     Storyboard.TargetProperty="Y"
+                                     From="-14" To="0" Duration="0:0:0.5"
+                                     BeginTime="0:0:0.15">
+                        <DoubleAnimation.EasingFunction>
+                            <CubicEase EasingMode="EaseOut" />
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <DoubleAnimation Storyboard.TargetName="LayerFront"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" Duration="0:0:0.45"
+                                     BeginTime="0:0:0.3" />
+                    <DoubleAnimation Storyboard.TargetName="LayerFrontScale"
+                                     Storyboard.TargetProperty="ScaleX"
+                                     From="0.8" To="1" Duration="0:0:0.45"
+                                     BeginTime="0:0:0.3">
+                        <DoubleAnimation.EasingFunction>
+                            <CubicEase EasingMode="EaseOut" />
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <DoubleAnimation Storyboard.TargetName="LayerFrontScale"
+                                     Storyboard.TargetProperty="ScaleY"
+                                     From="0.8" To="1" Duration="0:0:0.45"
+                                     BeginTime="0:0:0.3">
+                        <DoubleAnimation.EasingFunction>
+                            <CubicEase EasingMode="EaseOut" />
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <!-- Resplandor de marca latiendo -->
+                    <DoubleAnimation Storyboard.TargetName="BrandGlow"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0.18" To="0.32" Duration="0:0:1.4"
+                                     AutoReverse="True" RepeatBehavior="Forever">
+                        <DoubleAnimation.EasingFunction>
+                            <SineEase EasingMode="EaseInOut" />
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </Window.Triggers>
 
-            <!-- Logo -->
-            <ContentControl Grid.Row="0"
-                            Content="{StaticResource IconLogo}"
-                            Width="110" Height="110"
-                            HorizontalAlignment="Center"
-                            Margin="0,48,0,0" />
+    <Border CornerRadius="12"
+            BorderBrush="{StaticResource GlassBorderBrush}"
+            BorderThickness="1"
+            ClipToBounds="True">
+        <Border.Background>
+            <SolidColorBrush Color="{StaticResource BaseBackgroundColor}" />
+        </Border.Background>
+        <Grid>
+            <!-- Fondo desenfocado (una de las imágenes, offline) -->
+            <Image Source="pack://application:,,,/Assets/Backgrounds/bg1.png"
+                   Stretch="UniformToFill"
+                   RenderOptions.BitmapScalingMode="LowQuality">
+                <Image.Effect>
+                    <BlurEffect Radius="28" />
+                </Image.Effect>
+            </Image>
+            <Border Background="{StaticResource BackgroundScrimBrush}" />
+            <Border Background="{StaticResource BrandTintBrush}" />
 
-            <!-- Title -->
-            <TextBlock Grid.Row="1"
-                       x:Name="AppTitleLabel"
-                       Text="MINEMOUNT"
-                       HorizontalAlignment="Center"
-                       FontSize="32"
-                       FontWeight="Bold"
-                       FontFamily="{StaticResource FontFamilyDisplay}"
-                       Foreground="White"
-                       Margin="0,26,0,0" />
+            <Grid Margin="36,32">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-            <!-- Loading label -->
-            <TextBlock Grid.Row="2"
-                       x:Name="StatusLabel"
-                       Text="Cargando..."
-                       HorizontalAlignment="Center"
-                       Style="{StaticResource TextBlock.Secondary}"
-                       Margin="0,16,0,0" />
+                <!-- Logo en capas apiladas -->
+                <Grid Grid.Row="0" Height="150"
+                      HorizontalAlignment="Center"
+                      Margin="0,48,0,0">
+                    <Ellipse x:Name="BrandGlow"
+                             Width="200" Height="200"
+                             Fill="{StaticResource BrandGradientBrush}"
+                             Opacity="0.25" />
+                    <ContentControl x:Name="LayerBack"
+                                    Content="{StaticResource IconLogo}"
+                                    Width="110" Height="110"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Opacity="0">
+                        <ContentControl.RenderTransform>
+                            <TranslateTransform x:Name="LayerBackShift" X="0" Y="0" />
+                        </ContentControl.RenderTransform>
+                    </ContentControl>
+                    <ContentControl x:Name="LayerMid"
+                                    Content="{StaticResource IconLogo}"
+                                    Width="110" Height="110"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Opacity="0">
+                        <ContentControl.RenderTransform>
+                            <TranslateTransform x:Name="LayerMidShift" X="0" Y="0" />
+                        </ContentControl.RenderTransform>
+                    </ContentControl>
+                    <ContentControl x:Name="LayerFront"
+                                    Content="{StaticResource IconLogo}"
+                                    Width="110" Height="110"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Opacity="0"
+                                    RenderTransformOrigin="0.5,0.5">
+                        <ContentControl.RenderTransform>
+                            <ScaleTransform x:Name="LayerFrontScale" ScaleX="1" ScaleY="1" />
+                        </ContentControl.RenderTransform>
+                    </ContentControl>
+                </Grid>
 
-            <!-- Progress bar -->
-            <Grid Grid.Row="4"
-                  VerticalAlignment="Bottom">
-                <ProgressBar x:Name="ProgressBar"
-                             Minimum="0"
-                             Maximum="100"
-                             Value="0"
-                             Height="8"
-                             Style="{StaticResource ProgressBar.Base}" />
-            </Grid>
+                <!-- Título -->
+                <TextBlock Grid.Row="1"
+                           x:Name="AppTitleLabel"
+                           Text="MINEMOUNT"
+                           HorizontalAlignment="Center"
+                           FontSize="32"
+                           FontWeight="Bold"
+                           FontFamily="{StaticResource FontFamilyDisplay}"
+                           Foreground="White"
+                           Margin="0,26,0,0">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="16" ShadowDepth="0" Color="#CC000000" Opacity="0.8" />
+                    </TextBlock.Effect>
+                </TextBlock>
 
-            <!-- Percent -->
-            <Grid Grid.Row="5" Margin="0,8,0,0">
-                <TextBlock x:Name="PercentLabel"
-                           Text="0 %"
-                           HorizontalAlignment="Left"
-                           FontSize="11"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource AccentLightBrush}" />
-                <TextBlock x:Name="VersionLabel"
-                           Text="1.0.0"
-                           HorizontalAlignment="Right"
-                           VerticalAlignment="Center"
-                           FontSize="11"
-                           Foreground="{StaticResource ForegroundMutedBrush}" />
+                <!-- Estado -->
+                <TextBlock Grid.Row="2"
+                           x:Name="StatusLabel"
+                           Text="Cargando..."
+                           HorizontalAlignment="Center"
+                           Style="{StaticResource TextBlock.Secondary}"
+                           Margin="0,16,0,0" />
+
+                <!-- Progreso con gradiente morado → cian -->
+                <Grid Grid.Row="4"
+                      VerticalAlignment="Bottom">
+                    <ProgressBar x:Name="ProgressBar"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Value="0"
+                                 Height="8"
+                                 Style="{StaticResource ProgressBar.Glow}" />
+                </Grid>
+
+                <!-- Porcentaje + versión -->
+                <Grid Grid.Row="5" Margin="0,8,0,0">
+                    <TextBlock x:Name="PercentLabel"
+                               Text="0 %"
+                               HorizontalAlignment="Left"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource CyanLightBrush}" />
+                    <TextBlock x:Name="VersionLabel"
+                               Text="1.0.0"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="{StaticResource ForegroundMutedBrush}" />
+                </Grid>
             </Grid>
         </Grid>
     </Border>

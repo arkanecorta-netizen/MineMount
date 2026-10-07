@@ -4,104 +4,18 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:views="clr-namespace:MineMount.Views"
+             xmlns:models="clr-namespace:MineMount.Models"
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="1000">
 
-    <UserControl.Resources>
-        <LinearGradientBrush x:Key="SeriesThumbFallbackBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#FF241040" Offset="0" />
-            <GradientStop Color="#FF150A26" Offset="1" />
-        </LinearGradientBrush>
-
-        <Style x:Key="SeriesListItem" TargetType="ListBoxItem">
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,0,8" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="CardBorder"
-                                Background="{StaticResource BackgroundTertiaryBrush}"
-                                BorderBrush="Transparent"
-                                BorderThickness="1"
-                                CornerRadius="8"
-                                Padding="12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="44" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0"
-                                        Width="40" Height="40"
-                                        CornerRadius="8"
-                                        ClipToBounds="True"
-                                        Background="{StaticResource SeriesThumbFallbackBrush}">
-                                    <Grid>
-                                        <ContentControl Content="{StaticResource IconLogo}"
-                                                        Width="20" Height="20"
-                                                        HorizontalAlignment="Center"
-                                                        VerticalAlignment="Center"
-                                                        Opacity="0.6" />
-                                        <Image Source="{Binding Logo, RelativeSource={RelativeSource TemplatedParent}}"
-                                               Stretch="UniformToFill">
-                                            <Image.Style>
-                                                <Style TargetType="Image">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Logo, RelativeSource={RelativeSource TemplatedParent}}" Value="">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Image.Style>
-                                        </Image>
-                                    </Grid>
-                                </Border>
-
-                                <StackPanel Grid.Column="1"
-                                            Margin="10,0,0,0"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Name}"
-                                               FontSize="14"
-                                               FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <StackPanel Orientation="Horizontal"
-                                                Margin="0,4,0,0">
-                                        <TextBlock Text="{Binding StatusText}"
-                                                   FontSize="10"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource AccentLightBrush}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding Version, StringFormat='v{0}'}"
-                                                   Style="{StaticResource TextBlock.Caption}"
-                                                   Margin="8,0,0,0"
-                                                   VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource BackgroundHoverBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource AccentTintBrush}" />
-                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
-
-    <Grid Margin="24">
+    <Grid Margin="28,16,28,20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Header -->
+        <!-- Encabezado -->
         <Grid Grid.Row="0" Margin="0,0,0,4">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="SERIES"
@@ -114,70 +28,285 @@
             <Button HorizontalAlignment="Right"
                     Command="{Binding RefreshCommand}"
                     ToolTip="Actualizar series"
-                    AutomationProperties.Name="Actualizar series">
-                <Button.Style>
-                    <Style TargetType="Button" BasedOn="{StaticResource Button.Icon}">
-                        <Setter Property="Padding" Value="8" />
-                    </Style>
-                </Button.Style>
+                    AutomationProperties.Name="Actualizar series"
+                    Style="{StaticResource Button.Icon}"
+                    Padding="8">
                 <ContentControl Content="{StaticResource IconRefresh}"
                                 Width="18" Height="18"
                                 Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
             </Button>
         </Grid>
 
-        <!-- Master-detail -->
-        <Grid Grid.Row="1" Margin="0,16,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="320" MinWidth="260" />
-                <ColumnDefinition Width="*" MinWidth="0" />
-            </Grid.ColumnDefinitions>
+        <!-- Grilla de tarjetas grandes -->
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,12,0,0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Margin="0,40,0,0"
+                            Visibility="{Binding HasSeries, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                    <TextBlock Text="No hay series disponibles"
+                               Style="{StaticResource TextBlock.Secondary}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="Revisa tu conexión o actualiza el catálogo"
+                               Style="{StaticResource TextBlock.Muted}"
+                               HorizontalAlignment="Center"
+                               Margin="0,4,0,0" />
+                </StackPanel>
 
-            <!-- Lista -->
-            <Border Grid.Column="0"
-                    Style="{StaticResource Card}"
-                    Margin="0,0,12,0"
-                    Padding="12">
-                <Grid>
-                    <ListBox x:Name="SeriesList"
-                             ItemsSource="{Binding Series}"
-                             SelectedItem="{Binding SelectedSeries, Mode=TwoWay}"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             Padding="0"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             ItemContainerStyle="{StaticResource SeriesListItem}" />
+                <ItemsControl ItemsSource="{Binding Series}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Width="300" Margin="0,0,14,14"
+                                    ClipToBounds="True">
+                                <Border.InputBindings>
+                                    <MouseBinding MouseAction="LeftClick"
+                                                  Command="{Binding DataContext.SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                  CommandParameter="{Binding}" />
+                                </Border.InputBindings>
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="{StaticResource GlassCardBrush}" />
+                                        <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
+                                        <Setter Property="BorderThickness" Value="1" />
+                                        <Setter Property="CornerRadius" Value="14" />
+                                        <Setter Property="Effect" Value="{StaticResource ShadowMD}" />
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
+                                                <Setter Property="Effect" Value="{StaticResource ShadowGlow}" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel>
+                                    <!-- Arte -->
+                                    <Border Height="140" ClipToBounds="True"
+                                            CornerRadius="14,14,0,0"
+                                            Background="{StaticResource ThumbFallbackBrush}">
+                                        <Grid>
+                                            <ContentControl Content="{StaticResource IconLogo}"
+                                                            Width="40" Height="40"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center"
+                                                            Opacity="0.5" />
+                                            <Image Source="{Binding Banner}" Stretch="UniformToFill">
+                                                <Image.Style>
+                                                    <Style TargetType="Image">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Banner}" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Image.Style>
+                                            </Image>
+                                            <Border VerticalAlignment="Bottom">
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                        <GradientStop Color="#000B0B0F" Offset="0" />
+                                                        <GradientStop Color="#CC0B0B0F" Offset="1" />
+                                                    </LinearGradientBrush>
+                                                </Border.Background>
+                                            </Border>
+                                            <!-- Logo superpuesto -->
+                                            <Border Width="52" Height="52" CornerRadius="14"
+                                                    ClipToBounds="True"
+                                                    HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                                    Margin="14,0,0,12"
+                                                    BorderBrush="{StaticResource GlassBorderBrush}"
+                                                    BorderThickness="1"
+                                                    Background="{StaticResource GlassCardBrush}">
+                                                <Grid>
+                                                    <ContentControl Content="{StaticResource IconLogo}"
+                                                                    Width="22" Height="22"
+                                                                    HorizontalAlignment="Center"
+                                                                    VerticalAlignment="Center"
+                                                                    Opacity="0.7" />
+                                                    <Image Source="{Binding Logo}" Stretch="UniformToFill">
+                                                        <Image.Style>
+                                                            <Style TargetType="Image">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Logo}" Value="">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Image.Style>
+                                                    </Image>
+                                                </Grid>
+                                            </Border>
+                                            <!-- Estado -->
+                                            <Border x:Name="StatusPill"
+                                                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                    Margin="0,12,12,0"
+                                                    CornerRadius="9999" Padding="10,4"
+                                                    Background="#38000000">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Ellipse x:Name="StatusDot" Width="8" Height="8"
+                                                             Fill="#FFA1A1AA" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding StatusText}"
+                                                               FontSize="10" FontWeight="Bold"
+                                                               Foreground="White"
+                                                               Margin="6,0,0,0" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
 
-                    <StackPanel HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                IsHitTestVisible="False">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding HasSeries}" Value="False">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-                        <TextBlock Text="No hay series disponibles"
-                                   Style="{StaticResource TextBlock.Secondary}"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Text="Revisa tu conexión o actualiza el catálogo"
-                                   Style="{StaticResource TextBlock.Muted}"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,4,0,0" />
-                    </StackPanel>
-                </Grid>
-            </Border>
+                                    <!-- Info -->
+                                    <StackPanel Margin="14,12,14,14">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontFamily="{StaticResource FontFamilyDisplay}"
+                                                   FontSize="19" FontWeight="Bold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Description}"
+                                                   Style="{StaticResource TextBlock.Muted}"
+                                                   TextWrapping="Wrap" MaxHeight="38"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="0,4,0,0" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                            <Border CornerRadius="9999" Padding="9,3" Margin="0,0,8,0"
+                                                    Background="{StaticResource GlassCardBrush}"
+                                                    BorderBrush="{StaticResource GlassBorderBrush}"
+                                                    BorderThickness="1">
+                                                <TextBlock FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource CyanLightBrush}">
+                                                    <Run Text="{Binding Definition.MinecraftVersion, Mode=OneWay}" />
+                                                    <Run Text=" · " />
+                                                    <Run Text="{Binding Definition.Loader, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </Border>
+                                            <Border CornerRadius="9999" Padding="9,3"
+                                                    Background="{StaticResource GlassCardBrush}"
+                                                    BorderBrush="{StaticResource GlassBorderBrush}"
+                                                    BorderThickness="1">
+                                                <TextBlock Text="{Binding Version, StringFormat=v{0}}"
+                                                           FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource ForegroundSecondaryBrush}" />
+                                            </Border>
+                                        </StackPanel>
 
-            <!-- Detalle embebido -->
-            <Border Grid.Column="1"
-                    Style="{StaticResource Card}"
-                    Padding="20">
-                <views:SeriesDetailView DataContext="{Binding Detail}" />
-            </Border>
-        </Grid>
+                                        <!-- Botón contextual -->
+                                        <Grid Margin="0,12,0,0">
+                                            <Button Content="JUGAR"
+                                                    Command="{Binding DataContext.PlaySeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Height="40" HorizontalAlignment="Stretch">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.Installed}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Button Content="INSTALAR"
+                                                    Command="{Binding DataContext.InstallSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    HorizontalAlignment="Stretch" Height="40">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.NotInstalled}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Button Content="ACTUALIZAR"
+                                                    Command="{Binding DataContext.UpdateSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    HorizontalAlignment="Stretch" Height="40">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.UpdateAvailable}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <Button Content="REPARAR"
+                                                    Command="{Binding DataContext.RepairSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    HorizontalAlignment="Stretch" Height="40">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Secondary}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.MissingFiles}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <TextBlock Text="PRÓXIMAMENTE"
+                                                       HorizontalAlignment="Center"
+                                                       FontWeight="SemiBold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource TextBlock.Muted}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.ComingSoon}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Grid>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.Installed}">
+                                    <Setter TargetName="StatusDot" Property="Fill" Value="{StaticResource SuccessBrush}" />
+                                    <Setter TargetName="StatusPill" Property="Background" Value="#3822C55E" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.UpdateAvailable}">
+                                    <Setter TargetName="StatusDot" Property="Fill" Value="{StaticResource WarningBrush}" />
+                                    <Setter TargetName="StatusPill" Property="Background" Value="#38FBBF24" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.MissingFiles}">
+                                    <Setter TargetName="StatusDot" Property="Fill" Value="{StaticResource ErrorBrush}" />
+                                    <Setter TargetName="StatusPill" Property="Background" Value="#38F87171" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.NotInstalled}">
+                                    <Setter TargetName="StatusDot" Property="Fill" Value="{StaticResource CyanPrimaryBrush}" />
+                                    <Setter TargetName="StatusPill" Property="Background" Value="#3822D3EE" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Detalle de la serie seleccionada -->
+        <Border Grid.Row="2"
+                Style="{StaticResource Card}"
+                Margin="0,12,0,0"
+                Padding="18"
+                MaxHeight="330">
+            <views:SeriesDetailView DataContext="{Binding Detail}" />
+        </Border>
     </Grid>
 </UserControl>

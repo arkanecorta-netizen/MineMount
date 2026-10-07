@@ -110,4 +110,47 @@ public partial class SeriesViewModel : ObservableObject
     {
         _ = RefreshAsync();
     }
+
+    [RelayCommand]
+    private void SelectSeries(SeriesInfo? series)
+    {
+        if (series != null) SelectedSeries = series;
+    }
+
+    // Botones contextuales de las tarjetas (grilla): operan sobre la serie tocada.
+    [RelayCommand]
+    private async Task PlaySeriesAsync(SeriesInfo? series)
+    {
+        if (series == null) return;
+        SelectedSeries = series;
+        await Detail.LoadAsync(series.Id);
+        if (Detail.PlayCommand.CanExecute(null)) Detail.PlayCommand.Execute(null);
+    }
+
+    [RelayCommand]
+    private async Task InstallSeriesAsync(SeriesInfo? series)
+    {
+        if (series == null) return;
+        SelectedSeries = series;
+        await Detail.LoadAsync(series.Id);
+        if (Detail.InstallCommand.CanExecute(null)) Detail.InstallCommand.Execute(null);
+    }
+
+    [RelayCommand]
+    private async Task UpdateSeriesAsync(SeriesInfo? series)
+    {
+        if (series == null) return;
+        SelectedSeries = series;
+        await Detail.LoadAsync(series.Id);
+        if (Detail.UpdateCommand.CanExecute(null)) Detail.UpdateCommand.Execute(null);
+    }
+
+    [RelayCommand]
+    private async Task RepairSeriesAsync(SeriesInfo? series)
+    {
+        if (series == null) return;
+        SelectedSeries = series;
+        await Detail.LoadAsync(series.Id);
+        if (Detail.RepairCommand.CanExecute(null)) Detail.RepairCommand.Execute(null);
+    }
 }

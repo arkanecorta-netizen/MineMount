@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using MineMount.Models;
 
@@ -17,8 +19,13 @@ public class SeriesLaunchConfig
     public string JavaPath { get; set; } = string.Empty;
     public int MinRAM { get; set; } = 2048;
     public int MaxRAM { get; set; } = 4096;
-    public string JVMArgs { get; set; } = string.Empty;
-    public string GameArgs { get; set; } = string.Empty;
+    public string Classpath { get; set; } = string.Empty;
+    public string NativesDir { get; set; } = string.Empty;
+    public string GameDir { get; set; } = string.Empty;
+    public string AssetsDir { get; set; } = string.Empty;
+    public string AssetIndex { get; set; } = string.Empty;
+    public string Username { get; set; } = "Player";
+    public string UUID { get; set; } = string.Empty;
     public bool MinimizeLauncher { get; set; }
 }
 
@@ -31,15 +38,15 @@ public class LaunchResult
 
 public interface IGameLauncherService
 {
-    Task<string?> FindJavaAsync();
+    Task<string?> FindJavaAsync(int minMajorVersion = 0);
     Task<bool> VerifyInstallationAsync(string seriesId);
-    Task<LaunchResult> LaunchAsync(string seriesId);
+    Task<LaunchResult> LaunchAsync(string seriesId, IProgress<double>? progress = null);
     bool IsGameRunning { get; }
 }
 
 // Lanzador de series. El ViewModel NO ejecuta Minecraft directamente:
-// pasa por este servicio, que verifica, construye la configuración y
-// registra el proceso sin bloquear la interfaz.
+// pasa por este servicio, que verifica, instala lo necesario, construye
+// la configuración y registra el proceso sin bloquear la interfaz.
 public class GameLauncherService : IGameLauncherService
 {
     private readonly ISeriesService _seriesService;
@@ -47,6 +54,8 @@ public class GameLauncherService : IGameLauncherService
     private readonly ISettingsService _settingsService;
     private readonly ILogService _logService;
     private readonly INotificationService _notificationService;
+    private readonly IMinecraftInstallService _minecraftInstall;
+    private readonly IForgeInstallService _forgeInstall;
 
     private Process? _runningProcess;
 
@@ -57,20 +66,25 @@ public class GameLauncherService : IGameLauncherService
         ISeriesStorageService storageService,
         ISettingsService settingsService,
         ILogService logService,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IMinecraftInstallService minecraftInstall,
+        IForgeInstallService forgeInstall)
     {
         _seriesService = seriesService;
         _storageService = storageService;
         _settingsService = settingsService;
         _logService = logService;
         _notificationService = notificationService;
+        _minecraftInstall = minecraftInstall;
+        _forgeInstall = forgeInstall;
     }
 
     // ---------------------------------------------------------------
     //  Detección de Java: ruta configurada → JAVA_HOME → PATH →
-    //  ubicaciones comunes de instalación
+    //  ubicaciones comunes. Permite exigir una versión mínima
+    //  (Forge 1.20.1 necesita Java 17).
     // ---------------------------------------------------------------
-    public async Task<string?> FindJavaAsync()
+    public async Task<string?> FindJavaAsync(int minMajorVersion = 0)
     {
         var candidates = new List<string>();
 
@@ -105,16 +119,19 @@ public class GameLauncherService : IGameLauncherService
 
         foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
         {
+            var version = await GetJavaVersionAsync(candidate);
+            if (version < minMajorVersion) continue;
+
             if (candidate == "java")
             {
-                if (IsJavaOnPath()) return "java";
+                if (version >= minMajorVersion) return "java";
                 continue;
             }
 
             var full = Path.GetFullPath(candidate);
             if (File.Exists(full))
             {
-                _logService.Info($"Java encontrado: {full}");
+                _logService.Info($"Java encontrado: {full} (v{version})");
                 return full;
             }
         }
@@ -129,35 +146,48 @@ public class GameLauncherService : IGameLauncherService
         return path;
     }
 
-    private static bool IsJavaOnPath()
+    private static async Task<int> GetJavaVersionAsync(string javaPath)
     {
         try
         {
-            using var p = Process.Start(new ProcessStartInfo
+            var psi = new ProcessStartInfo
             {
-                FileName = "java",
+                FileName = javaPath == "java" ? "java" : javaPath,
                 Arguments = "-version",
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
-            });
-            p?.WaitForExit(3000);
-            return p is { HasExited: true, ExitCode: 0 };
+            };
+
+            using var p = Process.Start(psi);
+            if (p == null) return 0;
+
+            var output = await p.StandardError.ReadToEndAsync();
+            p.WaitForExit(5000);
+
+            // "17.0.2" o "1.8.0_351"
+            var match = System.Text.RegularExpressions.Regex.Match(output, @"version ""(\d+)");
+            if (match.Success)
+            {
+                return int.Parse(match.Groups[1].Value);
+            }
         }
         catch
         {
-            return false;
+            // Java no disponible
         }
+
+        return 0;
     }
 
-    private static IEnumerable<string> SafeEnumerateDirectories(params string[] names)
+    private static IEnumerable<string> SafeEnumerateDirectories(string baseDir, params string[] names)
     {
         foreach (var name in names)
         {
             string? dir = null;
             try
             {
-                dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), name);
+                dir = Path.Combine(baseDir, name);
             }
             catch
             {
@@ -191,9 +221,8 @@ public class GameLauncherService : IGameLauncherService
         var info = await _seriesService.GetSeriesAsync(seriesId);
         if (info == null) return false;
 
-        if (info.Status == Models.SeriesStatus.NotInstalled) return false;
-
-        if (info.Status == Models.SeriesStatus.MissingFiles) return false;
+        if (info.Status == SeriesStatus.NotInstalled) return false;
+        if (info.Status == SeriesStatus.MissingFiles) return false;
 
         var manifest = await _storageService.ReadPackageManifestAsync(info.InstallPath);
         if (manifest?.Files is { Count: > 0 })
@@ -217,10 +246,10 @@ public class GameLauncherService : IGameLauncherService
     }
 
     // ---------------------------------------------------------------
-    //  Lanzamiento: verifica todo, construye la configuración y
-    //  arranca el proceso sin bloquear la interfaz
+    //  Lanzamiento: verifica, instala lo necesario, construye el
+    //  classpath y arranca el proceso sin bloquear la interfaz
     // ---------------------------------------------------------------
-    public async Task<LaunchResult> LaunchAsync(string seriesId)
+    public async Task<LaunchResult> LaunchAsync(string seriesId, IProgress<double>? progress = null)
     {
         var result = new LaunchResult();
 
@@ -239,13 +268,13 @@ public class GameLauncherService : IGameLauncherService
                 return result;
             }
 
-            if (info.Status == Models.SeriesStatus.NotInstalled)
+            if (info.Status == SeriesStatus.NotInstalled)
             {
                 result.Message = $"La serie {info.Name} no está instalada.";
                 return result;
             }
 
-            if (info.Status == Models.SeriesStatus.MissingFiles)
+            if (info.Status == SeriesStatus.MissingFiles)
             {
                 result.Message = $"La instalación de {info.Name} necesita reparación.";
                 _notificationService.NotifyWarning(
@@ -263,18 +292,10 @@ public class GameLauncherService : IGameLauncherService
                 return result;
             }
 
-            var java = await FindJavaAsync();
-            if (java == null)
-            {
-                result.Message = "Java no fue encontrado. Configurá la ruta de Java en Configuración.";
-                _notificationService.NotifyError(
-                    "Java no encontrado",
-                    "Instalá Java o configurá su ruta en Configuración → Juego.");
-                return result;
-            }
+            var mcVersion = info.Definition.MinecraftVersion;
+            var loader = info.Definition.Loader;
 
-            var config = await BuildLaunchConfigAsync(info, java);
-            if (config == null)
+            if (string.IsNullOrWhiteSpace(mcVersion) || string.IsNullOrWhiteSpace(loader))
             {
                 result.Message = $"Falta definir la versión de Minecraft/loader de {info.Name} en el catálogo.";
                 _notificationService.NotifyError(
@@ -283,24 +304,57 @@ public class GameLauncherService : IGameLauncherService
                 return result;
             }
 
+            // Instalar Minecraft vanilla si falta
+            progress?.Report(0);
+            if (!await _minecraftInstall.IsVersionInstalledAsync(mcVersion))
+            {
+                _notificationService.NotifyInfo(
+                    "Descargando Minecraft",
+                    $"Instalando Minecraft {mcVersion}...");
+                await _minecraftInstall.InstallVersionAsync(mcVersion, progress, CancellationToken.None);
+            }
+
+            // Instalar Forge si falta
+            if (!await _forgeInstall.IsForgeInstalledAsync(mcVersion))
+            {
+                _notificationService.NotifyInfo(
+                    "Descargando Forge",
+                    $"Instalando Forge para {mcVersion}...");
+                await _forgeInstall.InstallForgeAsync(mcVersion, progress, CancellationToken.None);
+            }
+
+            // Java (Forge 1.20.1 necesita Java 17)
+            var java = await FindJavaAsync(17);
+            if (java == null)
+            {
+                result.Message = "Java 17 no fue encontrado. Instalá Java 17 o configurá su ruta.";
+                _notificationService.NotifyError(
+                    "Java 17 no encontrado",
+                    "Forge 1.20.1 necesita Java 17. Instalá Java 17 o configurá su ruta en Configuración → Juego.");
+                return result;
+            }
+
+            var config = await BuildLaunchConfigAsync(info, java);
+            if (config == null)
+            {
+                result.Message = "No se pudo construir la configuración de lanzamiento.";
+                return result;
+            }
+
             var psi = new ProcessStartInfo
             {
                 FileName = config.JavaPath,
                 Arguments = BuildArguments(config),
-                WorkingDirectory = config.SeriesDir,
+                WorkingDirectory = config.GameDir,
                 UseShellExecute = false,
-                CreateNoWindow = false,
-                RedirectStandardOutput = false,
-                RedirectStandardError = false
+                CreateNoWindow = false
             };
 
             var process = Process.Start(psi);
             if (process == null)
             {
                 result.Message = "No se pudo iniciar el proceso.";
-                _notificationService.NotifyError(
-                    "Error de inicio",
-                    $"No se pudo iniciar {info.Name}.");
+                _notificationService.NotifyError("Error de inicio", $"No se pudo iniciar {info.Name}.");
                 return result;
             }
 
@@ -320,18 +374,20 @@ public class GameLauncherService : IGameLauncherService
             result.Success = true;
             result.Process = process;
             result.Message = $"{info.Name} iniciada.";
-            _notificationService.NotifySuccess(
-                $"{info.Name} iniciada",
-                "La serie se está ejecutando.");
+            _notificationService.NotifySuccess($"{info.Name} iniciada", "La serie se está ejecutando.");
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            result.Message = "Instalación cancelada.";
+            _notificationService.NotifyInfo("Cancelado", "La instalación de Minecraft fue cancelada.");
             return result;
         }
         catch (Exception ex)
         {
             _logService.Error($"No se pudo iniciar {seriesId}", ex);
             result.Message = "No se pudo iniciar el proceso.";
-            _notificationService.NotifyError(
-                "Error de inicio",
-                $"No se pudo iniciar la serie: {ex.Message}");
+            _notificationService.NotifyError("Error de inicio", $"No se pudo iniciar la serie: {ex.Message}");
             return result;
         }
     }
@@ -366,73 +422,93 @@ public class GameLauncherService : IGameLauncherService
 
     // ---------------------------------------------------------------
     //  Construcción de la configuración de lanzamiento.
-    //  Los datos de Minecraft/loader vienen del catálogo (SeriesDefinition).
-    //  Si no están definidos, no se inventan: se reporta la falta.
+    //  Los datos de Minecraft/loader vienen del catálogo.
     // ---------------------------------------------------------------
     private async Task<SeriesLaunchConfig?> BuildLaunchConfigAsync(SeriesInfo info, string javaPath)
     {
         var settings = await _settingsService.GetSettingsAsync();
-
-        // La versión de Minecraft y el loader DEBEN estar en el catálogo.
-        // No se inventan: sin ellos no hay lanzamiento real.
         var mcVersion = info.Definition.MinecraftVersion;
-        var loader = info.Definition.Loader;
-
-        if (string.IsNullOrWhiteSpace(mcVersion) || string.IsNullOrWhiteSpace(loader))
-        {
-            return null;
-        }
 
         var maxRAM = settings.AllocatedRAM;
         var available = GetAvailablePhysicalMemoryMB();
 
-        // No asignar RAM arbitraria enorme: tope razonable según memoria disponible
         if (available > 0)
         {
             maxRAM = Math.Min(maxRAM, (int)(available * 0.75));
         }
 
-        maxRAM = Math.Max(1024, maxRAM);
+        maxRAM = Math.Max(2048, maxRAM);
+
+        // Classpath: client jar + libraries + forge universal jar
+        var clientJar = await _minecraftInstall.GetClientJarPathAsync(mcVersion);
+        var libraries = await _minecraftInstall.GetLibraryPathsAsync(mcVersion);
+        var forgeJar = await _forgeInstall.GetForgeJarPathAsync(mcVersion);
+
+        var classpathParts = new List<string> { clientJar };
+        classpathParts.AddRange(libraries);
+        classpathParts.Add(forgeJar);
+
+        var nativesDir = await _minecraftInstall.GetNativesDirAsync(mcVersion);
+        var assetsDir = await _minecraftInstall.GetAssetsDirAsync(mcVersion);
+
+        var versionJsonPath = await _minecraftInstall.GetVersionJsonPathAsync(mcVersion);
+        var assetIndex = "5";
+        try
+        {
+            if (File.Exists(versionJsonPath))
+            {
+                var json = await File.ReadAllTextAsync(versionJsonPath);
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("assetIndex", out var ai)
+                    && ai.TryGetProperty("id", out var id))
+                {
+                    assetIndex = id.GetString() ?? "5";
+                }
+            }
+        }
+        catch
+        {
+            // Usar assetIndex por defecto
+        }
 
         return new SeriesLaunchConfig
         {
             SeriesId = info.Id,
             SeriesDir = info.InstallPath,
             MinecraftVersion = mcVersion,
-            Loader = loader,
+            Loader = info.Definition.Loader,
             JavaPath = javaPath,
             MinRAM = Math.Min(2048, maxRAM),
             MaxRAM = maxRAM,
-            JVMArgs = info.Definition.JVMArgs,
-            GameArgs = info.Definition.GameArgs,
+            Classpath = string.Join(';', classpathParts),
+            NativesDir = nativesDir,
+            GameDir = info.InstallPath,
+            AssetsDir = assetsDir,
+            AssetIndex = assetIndex,
+            Username = string.IsNullOrWhiteSpace(settings.UserName) ? "Player" : settings.UserName,
+            UUID = Guid.NewGuid().ToString("N"),
             MinimizeLauncher = settings.MinimizeOnLaunch
         };
     }
 
     private static string BuildArguments(SeriesLaunchConfig config)
     {
-        var parts = new List<string>
-        {
-            $"-Xms{config.MinRAM}M",
-            $"-Xmx{config.MaxRAM}M"
-        };
-
-        if (!string.IsNullOrWhiteSpace(config.JVMArgs))
-        {
-            parts.Add(config.JVMArgs);
-        }
-
-        // El classpath y la clase principal dependen del loader y la
-        // versión: se construyen desde la configuración, nunca hardcodeados.
-        // (Cuando el catálogo defina loader/versión, aquí se ensambla el
-        //  classpath de Forge/NeoForge/Fabric correspondiente.)
-
-        if (!string.IsNullOrWhiteSpace(config.GameArgs))
-        {
-            parts.Add(config.GameArgs);
-        }
-
-        return string.Join(" ", parts);
+        // Forge 1.20.1 usa launchwrapper con FMLTweaker.
+        // El classpath y los args se construyen desde la configuración.
+        return $"-Xms{config.MinRAM}M " +
+               $"-Xmx{config.MaxRAM}M " +
+               $"-Djava.library.path=\"{config.NativesDir}\" " +
+               $"-cp \"{config.Classpath}\" " +
+               "net.minecraft.launchwrapper.Launch " +
+               $"--username {config.Username} " +
+               $"--version {config.MinecraftVersion}-forge " +
+               $"--gameDir \"{config.GameDir}\" " +
+               $"--assetsDir \"{config.AssetsDir}\" " +
+               $"--assetIndex {config.AssetIndex} " +
+               $"--uuid {config.UUID} " +
+               "--accessToken 0 " +
+               "--userType legacy " +
+               "--tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker";
     }
 
     private static long GetAvailablePhysicalMemoryMB()

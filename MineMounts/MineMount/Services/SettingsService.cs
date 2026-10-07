@@ -10,12 +10,15 @@ public interface ISettingsService
     Task<Models.LauncherSettings> GetSettingsAsync();
     Task SaveSettingsAsync(Models.LauncherSettings settings);
     Task LoadAsync();
+    event EventHandler? SettingsChanged;
 }
 
 public class SettingsService : ISettingsService
 {
     private readonly string _settingsPath;
     private Models.LauncherSettings _settings = new();
+
+    public event EventHandler? SettingsChanged;
 
     public SettingsService()
     {
@@ -51,5 +54,6 @@ public class SettingsService : ISettingsService
         _settings = settings;
         var json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(_settingsPath, json);
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 }

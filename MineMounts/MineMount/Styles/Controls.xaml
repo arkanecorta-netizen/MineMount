@@ -308,7 +308,11 @@
                                     Margin="0,8"
                                     Background="{StaticResource AccentPrimaryBrush}"
                                     CornerRadius="1.5"
-                                    Opacity="0" />
+                                    Opacity="0">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="#FFA855F7" Opacity="0.8" />
+                                </Border.Effect>
+                            </Border>
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="Center"
                                               Margin="{TemplateBinding Padding}"
@@ -404,15 +408,18 @@
         </Setter>
     </Style>
 
-    <!-- Play Button (Large) -->
+    <!-- Botón JUGAR enorme (barra inferior): alto ~64px, radio 10, degradado
+         morado #A855F7 → #7C3AED, glow animado en hover, pulso sutil listo -->
     <Style x:Key="Button.Play" TargetType="Button">
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyDisplay}" />
-        <Setter Property="FontSize" Value="{StaticResource FontSizeXL}" />
+        <Setter Property="FontSize" Value="22" />
         <Setter Property="FontWeight" Value="{StaticResource FontWeightBold}" />
         <Setter Property="Foreground" Value="White" />
-        <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}" />
+        <Setter Property="Background" Value="{StaticResource PlayGradientBrush}" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Padding" Value="48,20" />
+        <Setter Property="Padding" Value="40,0" />
+        <Setter Property="MinHeight" Value="64" />
+        <Setter Property="MinWidth" Value="220" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -423,15 +430,16 @@
                             RenderTransformOrigin="0.5,0.5"
                             Background="{TemplateBinding Background}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{StaticResource BorderRadiusLG}">
+                            CornerRadius="10">
                         <Border.RenderTransform>
                             <ScaleTransform x:Name="playScale" ScaleX="1" ScaleY="1" />
                         </Border.RenderTransform>
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="20"
+                            <DropShadowEffect x:Name="playGlow"
+                                              BlurRadius="28"
                                               ShadowDepth="0"
-                                              Color="#FFE53935"
-                                              Opacity="0.4" />
+                                              Color="#FFA855F7"
+                                              Opacity="0.45" />
                         </Border.Effect>
                         <Grid>
                             <Border x:Name="hoverLayer"
@@ -515,6 +523,45 @@
                                 </BeginStoryboard>
                             </Trigger.ExitActions>
                         </Trigger>
+                        <!-- Pulso sutil cuando está listo para jugar (IsEnabled) -->
+                        <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource Self}}" Value="True">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard x:Name="PulseStory">
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="playScale"
+                                                         Storyboard.TargetProperty="ScaleX"
+                                                         From="1" To="1.025"
+                                                         Duration="0:0:1.2"
+                                                         AutoReverse="True">
+                                            <DoubleAnimation.EasingFunction>
+                                                <QuadraticEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="playScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         From="1" To="1.025"
+                                                         Duration="0:0:1.2"
+                                                         AutoReverse="True">
+                                            <DoubleAnimation.EasingFunction>
+                                                <QuadraticEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="playGlow"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="0.45" To="0.7"
+                                                         Duration="0:0:1.2"
+                                                         AutoReverse="True">
+                                            <DoubleAnimation.EasingFunction>
+                                                <QuadraticEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="PulseStory" />
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="border" Property="Background" Value="{StaticResource BackgroundTertiaryBrush}" />
                             <Setter TargetName="hoverLayer" Property="Opacity" Value="0" />
@@ -847,22 +894,22 @@
         </Setter>
     </Style>
 
-    <!-- ProgressBar -->
+    <!-- ProgressBar base (compatibilidad): gradiente morado → cian -->
     <Style x:Key="ProgressBar.Base" TargetType="ProgressBar">
-        <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}" />
-        <Setter Property="Foreground" Value="{StaticResource AccentPrimaryBrush}" />
+        <Setter Property="Background" Value="#33000000" />
+        <Setter Property="Foreground" Value="{StaticResource ProgressGradientBrush}" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Height" Value="4" />
+        <Setter Property="Height" Value="6" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ProgressBar">
                     <Border Background="{TemplateBinding Background}"
-                            CornerRadius="2"
+                            CornerRadius="3"
                             ClipToBounds="True">
                         <Grid x:Name="PART_Track">
                             <Border x:Name="PART_Indicator"
                                     Background="{TemplateBinding Foreground}"
-                                    CornerRadius="2"
+                                    CornerRadius="3"
                                     HorizontalAlignment="Left" />
                         </Grid>
                     </Border>
@@ -871,13 +918,113 @@
         </Setter>
     </Style>
 
-    <!-- Card Style -->
+    <!-- Barra de progreso con brillo deslizante (descargas/instalación) -->
+    <Style x:Key="ProgressBar.Glow" TargetType="ProgressBar">
+        <Setter Property="Background" Value="#33000000" />
+        <Setter Property="Foreground" Value="{StaticResource ProgressGradientBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Height" Value="8" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            ClipToBounds="True">
+                        <Grid x:Name="PART_Track">
+                            <Border x:Name="PART_Indicator"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="4"
+                                    HorizontalAlignment="Left">
+                                <Border.Clip>
+                                    <RectangleGeometry Rect="0,0,1200,12" />
+                                </Border.Clip>
+                            </Border>
+                            <!-- Brillo que se desliza -->
+                            <Canvas x:Name="ShineHost" ClipToBounds="True">
+                                <Border x:Name="Shine"
+                                        Width="56" Height="12"
+                                        Canvas.Top="0" Canvas.Left="-60"
+                                        Opacity="0.55">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#00FFFFFF" Offset="0" />
+                                            <GradientStop Color="#BFFFFFFF" Offset="0.5" />
+                                            <GradientStop Color="#00FFFFFF" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <Border.RenderTransform>
+                                        <TranslateTransform x:Name="ShineTranslate" X="0" />
+                                    </Border.RenderTransform>
+                                </Border>
+                                <Canvas.Triggers>
+                                    <EventTrigger RoutedEvent="Canvas.Loaded">
+                                        <BeginStoryboard>
+                                            <Storyboard RepeatBehavior="Forever">
+                                                <DoubleAnimation Storyboard.TargetName="ShineTranslate"
+                                                                 Storyboard.TargetProperty="X"
+                                                                 From="-80" To="520"
+                                                                 Duration="0:0:1.8">
+                                                    <DoubleAnimation.EasingFunction>
+                                                        <QuadraticEase EasingMode="EaseInOut" />
+                                                    </DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                </Canvas.Triggers>
+                            </Canvas>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Card Style (glassmorphism: vidrio translúcido sobre el fondo) -->
     <Style x:Key="Card" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource BackgroundCardBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource BorderPrimaryBrush}" />
+        <Setter Property="Background" Value="{StaticResource GlassCardBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="{StaticResource BorderRadiusLG}" />
+        <Setter Property="CornerRadius" Value="14" />
         <Setter Property="Padding" Value="{StaticResource SpacingMD}" />
+        <Setter Property="Effect" Value="{StaticResource ShadowMD}" />
+    </Style>
+
+    <!-- Tarjeta de vidrio con hover: se eleva y el borde se ilumina en morado -->
+    <Style x:Key="CardGlass" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource GlassCardBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="{StaticResource SpacingMD}" />
+        <Setter Property="Effect" Value="{StaticResource ShadowMD}" />
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <TranslateTransform X="0" Y="0" />
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
+                <Setter Property="Effect" Value="{StaticResource ShadowGlow}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Tarjeta promocional pequeña (barra inferior derecha) -->
+    <Style x:Key="PromoCard" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource GlassCardBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- ListBoxItem (implicit) -->

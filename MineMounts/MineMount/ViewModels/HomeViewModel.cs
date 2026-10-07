@@ -44,6 +44,13 @@ public partial class HomeViewModel : ObservableObject
     [ObservableProperty]
     private bool _bannerIsNews;
 
+    // Hero tipográfico sobre el fondo: eyebrow con tracking + logo grande de la serie
+    [ObservableProperty]
+    private string _heroEyebrow = "MINEMOUNT · LAUNCHER";
+
+    [ObservableProperty]
+    private string _heroLogo = "pack://application:,,,/Assets/MineMount/logo.png";
+
     [ObservableProperty]
     private string _bannerActionText = string.Empty;
 
@@ -102,6 +109,8 @@ public partial class HomeViewModel : ObservableObject
             FeaturedSeries = series.FirstOrDefault(s => !string.IsNullOrEmpty(s.Banner))
                 ?? series.FirstOrDefault();
             UpdateFeaturedAction();
+            UpdateHero();
+            ApplySeriesBanner();
         }
         catch (Exception ex)
         {
@@ -124,7 +133,7 @@ public partial class HomeViewModel : ObservableObject
             ?? news.FirstOrDefault(n => !string.IsNullOrEmpty(n.ImageUrl));
 
         RecentNews = new ObservableCollection<NewsItem>(
-            news.Where(n => n != FeaturedNews).Take(4));
+            news.Where(n => n != FeaturedNews).Take(6));
 
         if (FeaturedNews != null && !string.IsNullOrEmpty(FeaturedNews.ImageUrl))
         {
@@ -133,6 +142,10 @@ public partial class HomeViewModel : ObservableObject
             BannerSubtitle = FeaturedNews.Description;
             BannerImageUrl = FeaturedNews.ImageUrl;
             BannerActionText = string.Empty;
+            HeroEyebrow = string.IsNullOrWhiteSpace(FeaturedNews.Category)
+                ? "NOTICIA DESTACADA"
+                : $"{FeaturedNews.Category.ToUpperInvariant()} · DESTACADO";
+            HeroLogo = "pack://application:,,,/Assets/MineMount/logo.png";
         }
         else if (FeaturedSeries != null)
         {
@@ -141,6 +154,7 @@ public partial class HomeViewModel : ObservableObject
             BannerSubtitle = FeaturedSeries.Description;
             BannerImageUrl = FeaturedSeries.Banner;
             BannerActionText = FeaturedActionText;
+            UpdateHero();
         }
         else
         {
@@ -149,7 +163,57 @@ public partial class HomeViewModel : ObservableObject
             BannerSubtitle = "Descubrí, instalá y gestioná tus series desde un solo lugar";
             BannerImageUrl = DefaultBannerUri;
             BannerActionText = string.Empty;
+            HeroEyebrow = "MINEMOUNT · LAUNCHER";
+            HeroLogo = "pack://application:,,,/Assets/MineMount/logo.png";
         }
+    }
+
+    /// <summary>
+    /// Línea del selector de serie/versión: "NSE6 · 1.20.1 · Forge" (datos reales del catálogo).
+    /// </summary>
+    public string SeriesVersionLine => FeaturedSeries == null
+        ? "Sin series"
+        : string.Join(" · ", new[]
+        {
+            FeaturedSeries.Name,
+            string.IsNullOrWhiteSpace(FeaturedSeries.Definition.MinecraftVersion)
+                ? $"v{FeaturedSeries.Version}"
+                : FeaturedSeries.Definition.MinecraftVersion,
+            FeaturedSeries.Definition.Loader
+        }.Where(s => !string.IsNullOrWhiteSpace(s)));
+
+    private void UpdateHero()
+    {
+        if (FeaturedSeries == null) return;
+
+        var parts = new System.Collections.Generic.List<string>();
+        if (!string.IsNullOrWhiteSpace(FeaturedSeries.Definition.MinecraftVersion))
+            parts.Add(FeaturedSeries.Definition.MinecraftVersion);
+        if (!string.IsNullOrWhiteSpace(FeaturedSeries.Definition.Loader))
+            parts.Add(FeaturedSeries.Definition.Loader.ToUpperInvariant());
+        parts.Add($"v{FeaturedSeries.Version}");
+
+        HeroEyebrow = $"{FeaturedSeries.Name.ToUpperInvariant()} · {string.Join(" · ", parts)}";
+        HeroLogo = string.IsNullOrWhiteSpace(FeaturedSeries.Logo)
+            ? "pack://application:,,,/Assets/MineMount/logo.png"
+            : FeaturedSeries.Logo;
+        OnPropertyChanged(nameof(SeriesVersionLine));
+    }
+
+    /// <summary>
+    /// Si no hay noticia destacada con imagen, el hero muestra la serie (nombre,
+    /// descripción y arte) en vez de un banner genérico vacío.
+    /// </summary>
+    private void ApplySeriesBanner()
+    {
+        if (FeaturedNews != null && !string.IsNullOrEmpty(FeaturedNews.ImageUrl)) return;
+        if (FeaturedSeries == null) return;
+
+        BannerIsNews = false;
+        BannerTitle = FeaturedSeries.Name;
+        BannerSubtitle = FeaturedSeries.Description;
+        BannerImageUrl = FeaturedSeries.Banner;
+        BannerActionText = FeaturedActionText;
     }
 
     private void UpdateFeaturedAction()
@@ -234,6 +298,9 @@ public partial class HomeViewModel : ObservableObject
         FeaturedSeries = series.FirstOrDefault(s => s.Id == FeaturedSeries?.Id)
             ?? series.FirstOrDefault();
         UpdateFeaturedAction();
+        UpdateHero();
+        ApplySeriesBanner();
+        UpdateHero();
     }
 
     [RelayCommand]
@@ -241,7 +308,13 @@ public partial class HomeViewModel : ObservableObject
     {
         if (FeaturedSeries == null) return;
 
-        var result = await _gameLauncher.LaunchAsync(FeaturedSeries.Id);
+        var progress = new Progress<double>(p =>
+        {
+            FeaturedProgress = p;
+            FeaturedProgressText = $"Preparando... {p:F0}%";
+        });
+
+        var result = await _gameLauncher.LaunchAsync(FeaturedSeries.Id, progress);
         if (!result.Success && string.IsNullOrEmpty(result.Message))
         {
             _notificationService.NotifyError("Error", "No se pudo iniciar la serie.");
