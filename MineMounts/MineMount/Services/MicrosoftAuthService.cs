@@ -34,7 +34,7 @@ public interface IMicrosoftAuthService
     /// sesión, la barra de direcciones trae el ?code= para pegar acá.
     /// </summary>
     string BuildAuthorizeUrl();
-    Task<MsaTokens?> ExchangeCodeAsync(string code, CancellationToken ct);
+    Task<(MsaTokens? Tokens, string? Error)> ExchangeCodeAsync(string code, CancellationToken ct);
     Task<MsaTokens?> RefreshAsync(string refreshToken, CancellationToken ct);
     Task<(string? McToken, DateTimeOffset Expires)> LoginMinecraftAsync(MsaTokens tokens, CancellationToken ct);
     Task<MinecraftProfile?> GetProfileAsync(string mcToken, CancellationToken ct);
@@ -83,10 +83,10 @@ public class MicrosoftAuthService : IMicrosoftAuthService
             + "&prompt=select_account";
     }
 
-    public async Task<MsaTokens?> ExchangeCodeAsync(string code, CancellationToken ct)
+    public async Task<(MsaTokens? Tokens, string? Error)> ExchangeCodeAsync(string code, CancellationToken ct)
     {
         code = (code ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(code)) return null;
+        if (string.IsNullOrWhiteSpace(code)) return (null, "código vacío");
 
         // Acepta el código pelado o la URL completa (?code=...).
         var codeIndex = code.IndexOf("code=", StringComparison.OrdinalIgnoreCase);
@@ -98,7 +98,7 @@ public class MicrosoftAuthService : IMicrosoftAuthService
             code = Uri.UnescapeDataString(code.Trim());
         }
 
-        if (string.IsNullOrWhiteSpace(code)) return null;
+        if (string.IsNullOrWhiteSpace(code)) return (null, "código vacío");
 
         var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {
@@ -113,19 +113,20 @@ public class MicrosoftAuthService : IMicrosoftAuthService
         var json = await resp.Content.ReadAsStringAsync(ct);
         if (!resp.IsSuccessStatusCode)
         {
-            _logService.Warning($"Canje de código falló: {ReadOAuthError(json)}");
-            return null;
+            var detail = ReadOAuthError(json);
+            _logService.Warning($"Canje de código falló: {detail}");
+            return (null, detail);
         }
 
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
         var expiresIn = root.TryGetProperty("expires_in", out var e) ? e.GetInt32() : 3600;
-        return new MsaTokens
+        return (new MsaTokens
         {
             AccessToken = root.GetProperty("access_token").GetString() ?? string.Empty,
             RefreshToken = root.TryGetProperty("refresh_token", out var r) ? r.GetString() ?? string.Empty : string.Empty,
             ExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(expiresIn - 60)
-        };
+        }, null);
     }
 
     private static string ReadOAuthError(string json)

@@ -185,11 +185,36 @@ public class MinecraftInstallService : IMinecraftInstallService
             if (!File.Exists(libPath)) return false;
         }
 
-        // Assets
+        // Assets: índice + verificación de que los objetos existen
+        // (antes solo se pedía el índice: instalaciones rotas pasaban
+        // como válidas y el juego moría al arrancar)
         var assetsDir = Path.Combine(dir, "assets");
         var indexDir = Path.Combine(assetsDir, "indexes");
         var indexFile = Path.Combine(indexDir, $"{version.AssetIndex?.Id}.json");
         if (!File.Exists(indexFile)) return false;
+
+        try
+        {
+            using var indexJson = JsonDocument.Parse(await File.ReadAllTextAsync(indexFile));
+            if (indexJson.RootElement.TryGetProperty("objects", out var objs)
+                && objs.ValueKind == JsonValueKind.Object)
+            {
+                var objectsDir = Path.Combine(assetsDir, "objects");
+                foreach (var prop in objs.EnumerateObject())
+                {
+                    if (!prop.Value.TryGetProperty("hash", out var hashProp)) continue;
+                    var hash = hashProp.GetString();
+                    if (string.IsNullOrEmpty(hash) || hash.Length < 2) continue;
+
+                    var assetPath = Path.Combine(objectsDir, hash.Substring(0, 2), hash);
+                    if (!File.Exists(assetPath)) return false;
+                }
+            }
+        }
+        catch
+        {
+            return false;
+        }
 
         return true;
     }
@@ -297,12 +322,16 @@ public class MinecraftInstallService : IMinecraftInstallService
         var indexJson = await File.ReadAllTextAsync(indexFile);
         using var doc = JsonDocument.Parse(indexJson);
         var objects = new List<(string Hash, long Size)>();
-        if (doc.RootElement.TryGetProperty("objects", out var objs))
+        // El índice de Mojang es un MAPA {"ruta": {"hash":..,"size":..}}, no un array
+        if (doc.RootElement.TryGetProperty("objects", out var objs)
+            && objs.ValueKind == JsonValueKind.Object)
         {
-            foreach (var obj in objs.EnumerateArray())
+            foreach (var prop in objs.EnumerateObject())
             {
-                var hash = obj.GetProperty("hash").GetString() ?? string.Empty;
-                var size = obj.GetProperty("size").GetInt64();
+                if (!prop.Value.TryGetProperty("hash", out var hashProp)) continue;
+                var hash = hashProp.GetString() ?? string.Empty;
+                var size = prop.Value.TryGetProperty("size", out var sizeProp)
+                    && sizeProp.TryGetInt64(out var s) ? s : 0;
                 if (!string.IsNullOrEmpty(hash))
                 {
                     objects.Add((hash, size));

@@ -225,7 +225,10 @@ public class GameLauncherService : IGameLauncherService
             });
         }
 
-        return found.OrderByDescending(f => f.Major).ThenBy(f => f.Path).ToList();
+        return found
+            .OrderBy(f => f.Major) // ascendente: el primero que cumpla es el más cercano
+            .ThenBy(f => f.Path)
+            .ToList();
     }
 
     private async Task<List<string>> GetJavaCandidates()
@@ -300,8 +303,11 @@ public class GameLauncherService : IGameLauncherService
             using var p = Process.Start(psi);
             if (p == null) return (0, string.Empty);
 
-            var output = await p.StandardError.ReadToEndAsync();
-            p.WaitForExit(5000);
+            // Sin bloquear el hilo UI: WaitForExitAsync con timeout
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var outputTask = p.StandardError.ReadToEndAsync();
+            await p.WaitForExitAsync(cts.Token);
+            var output = await outputTask;
 
             // openjdk version "17.0.11" ... / java version "1.8.0_412"
             var match = System.Text.RegularExpressions.Regex.Match(output, "version \"([\\d._]+)\"");
@@ -342,8 +348,10 @@ public class GameLauncherService : IGameLauncherService
             using var p = Process.Start(psi);
             if (p == null) return 0;
 
-            var output = await p.StandardError.ReadToEndAsync();
-            p.WaitForExit(5000);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var outputTask = p.StandardError.ReadToEndAsync();
+            await p.WaitForExitAsync(cts.Token);
+            var output = await outputTask;
 
             // "17.0.2" o "1.8.0_351"
             var match = System.Text.RegularExpressions.Regex.Match(output, @"version ""(\d+)");

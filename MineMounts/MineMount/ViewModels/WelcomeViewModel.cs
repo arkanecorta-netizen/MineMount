@@ -110,10 +110,12 @@ public partial class WelcomeViewModel : ObservableObject
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-            var tokens = await _msAuth.ExchangeCodeAsync(PastedCode.Trim(), cts.Token);
+            var (tokens, exchangeError) = await _msAuth.ExchangeCodeAsync(PastedCode.Trim(), cts.Token);
             if (tokens == null)
             {
-                MicrosoftError = Loc.T("S.Welcome.MSError") + " (código inválido o vencido)";
+                MicrosoftError = string.IsNullOrWhiteSpace(exchangeError)
+                    ? Loc.T("S.Welcome.MSError") + " (código inválido o vencido)"
+                    : exchangeError;
                 return;
             }
 
