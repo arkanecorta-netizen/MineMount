@@ -2,6 +2,7 @@
 bin/
 obj/
 Publish/
+Publish118/
 publish/
 Output/
 *.user

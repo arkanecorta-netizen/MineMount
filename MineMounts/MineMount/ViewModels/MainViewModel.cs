@@ -337,7 +337,7 @@ public partial class MainViewModel : ObservableObject
         PromoItems = new ObservableCollection<PromoItem>
         {
             new() { TitleKey = "S.Promo.Event", DescriptionKey = "S.Promo.EventSub", IconKey = "IconCalendar", Target = "Series" },
-            new() { TitleKey = "S.Promo.Updates", DescriptionKey = "S.Promo.UpdatesSub", IconKey = "IconUpdate", Target = "Updates" },
+            new() { TitleKey = "S.Promo.Discord", DescriptionKey = "S.Promo.DiscordSub", IconKey = "IconDiscord", Target = "Discord" },
         };
         RefreshPromoTexts();
     }
@@ -712,11 +712,38 @@ public partial class MainViewModel : ObservableObject
         {
             case "Series": _navigationService.NavigateTo(NavigationPage.Series); break;
             case "Settings": _navigationService.NavigateTo(NavigationPage.Settings); break;
-            case "Updates":
-                _ = CheckUpdatesAsync();
-                _navigationService.NavigateTo(NavigationPage.Settings);
-                break;
+            case "Discord": OpenDiscord(); break;
             default: _navigationService.NavigateTo(NavigationPage.Home); break;
+        }
+    }
+
+    /// <summary>Abre la invitación oficial de Discord (o la configurada).</summary>
+    private void OpenDiscord()
+    {
+        const string OfficialInvite = "https://discord.gg/4CjXmmKdA";
+        try
+        {
+            var configured = string.Empty;
+            try
+            {
+                configured = _settingsService.GetSettingsAsync().GetAwaiter().GetResult().DiscordUrl?.Trim() ?? string.Empty;
+            }
+            catch
+            {
+                configured = string.Empty;
+            }
+
+            var url = !string.IsNullOrWhiteSpace(configured)
+                && Uri.TryCreate(configured, UriKind.Absolute, out var custom)
+                && (custom.Scheme == Uri.UriSchemeHttp || custom.Scheme == Uri.UriSchemeHttps)
+                ? configured
+                : OfficialInvite;
+
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning($"No se pudo abrir Discord: {ex.Message}");
         }
     }
 
