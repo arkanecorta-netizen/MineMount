@@ -381,21 +381,21 @@ public class UpdateService : IUpdateService
 
             var appExe = Environment.ProcessPath
                          ?? Path.Combine(AppContext.BaseDirectory, "MineMount.exe");
-            var appDir = Path.GetDirectoryName(appExe) + Path.DirectorySeparatorChar;
+            var appDir = (Path.GetDirectoryName(appExe) ?? string.Empty)
+                .TrimEnd(Path.DirectorySeparatorChar);
             var pid = Environment.ProcessId;
             var scriptPath = Path.Combine(StageDir, "apply.cmd");
 
-            // Si la carpeta no es escribible (Program Files), el script se
-            // auto-eleva SOLO en ese caso. Nunca se muestra una consola.
-            var needsElevation = !IsDirectoryWritable(appDir);
-            if (needsElevation)
+            // Aviso previo solo si la carpeta no es escribible (Program Files):
+            // Windows va a pedir permiso igual, pero al menos no sorprende.
+            if (!IsDirectoryWritable(appDir))
             {
                 _notifications.NotifyWarning(
                     Loc.T("S.Update.NeedPerm"),
                     Loc.T("S.Update.NeedPermDesc"));
             }
 
-            var script = BuildApplyScript(pid, newExe, appDir, StageDir, needsElevation);
+            var script = BuildApplyScript(pid, newExe, appDir, StageDir);
             File.WriteAllText(scriptPath, script);
 
             Process.Start(new ProcessStartInfo
@@ -515,46 +515,39 @@ public class UpdateService : IUpdateService
         }
     }
 
-    private static string BuildApplyScript(int pid, string newExe, string appDir, string stageDir, bool needsElevation)
+    private static string BuildApplyScript(int pid, string newExe, string appDir, string stageDir)
     {
         // Script updater, siempre oculto (nunca muestra consola):
         //  1. Espera a que MineMount.exe (pid) termine
-        //  2. Copia el nuevo exe al directorio de la app
-        //  3. Solo si no hay permiso (Program Files) se relanza elevado,
-        //     también oculto (el UAC lo pide Windows, no se puede evitar ahí)
-        //  4. Reinicia MineMount y limpia el staging
-        var lines = new List<string>
+        //  2. Intenta copiar; si falla por permisos, se relanza elevado UNA
+        //     vez (net session detecta si ya es admin: sin bucles de UAC)
+        //  3. Reinicia MineMount y limpia el staging
+        // Nota: en Program Files Windows exige el UAC sí o sí; eso lo
+        // pide el sistema, no se puede evitar desde el launcher.
+        var lines = new[]
         {
             "@echo off",
             "setlocal",
             $"set \"PID={pid}\"",
             $"set \"NEW={newExe}\"",
             $"set \"APPDIR={appDir}\"",
-            $"set \"STAGE={stageDir}\""
-        };
-
-        if (needsElevation)
-        {
-            lines.Add("powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command \"Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '%~f0' -Verb RunAs -WindowStyle Hidden\"");
-            lines.Add("exit /b 0");
-        }
-
-        lines.AddRange(new[]
-        {
+            $"set \"STAGE={stageDir}\"",
             ":wait",
             "tasklist /FI \"PID eq %PID%\" 2>nul | find \"%PID%\" >nul",
             "if not errorlevel 1 (",
             "  timeout /t 1 /nobreak >nul",
             "  goto wait",
             ")",
-            "copy /Y \"%NEW%\" \"%APPDIR%MineMount.exe\" >nul 2>&1",
-            "if errorlevel 1 (",
-            "  powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command \"Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '%~f0' -Verb RunAs -WindowStyle Hidden\"",
-            "  exit /b 0",
-            ")",
-            "start \"\" \"%APPDIR%MineMount.exe\"",
+            "copy /Y \"%NEW%\" \"%APPDIR%\\MineMount.exe\" >nul 2>&1",
+            "if not errorlevel 1 goto started",
+            "net session >nul 2>&1",
+            "if not errorlevel 1 exit /b 1",
+            "powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command \"Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '%~f0' -Verb RunAs -WindowStyle Hidden\"",
+            "exit /b 0",
+            ":started",
+            "start \"\" \"%APPDIR%\\MineMount.exe\"",
             $"powershell -NoProfile -WindowStyle Hidden -Command \"Start-Sleep 5; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '{stageDir}'\""
-        });
+        };
 
         return string.Join("\r\n", lines) + "\r\n";
     }
