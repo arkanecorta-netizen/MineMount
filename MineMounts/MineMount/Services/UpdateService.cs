@@ -391,8 +391,8 @@ public class UpdateService : IUpdateService
             if (needsElevation)
             {
                 _notifications.NotifyWarning(
-                    "Permiso necesario",
-                    "La actualización necesita permiso de administrador (solo esta vez).");
+                    Loc.T("S.Update.NeedPerm"),
+                    Loc.T("S.Update.NeedPermDesc"));
             }
 
             var script = BuildApplyScript(pid, newExe, appDir, StageDir, needsElevation);

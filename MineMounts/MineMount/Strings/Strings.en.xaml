@@ -233,6 +233,8 @@
     <sys:String x:Key="S.Splash.S6">Finishing…</sys:String>
     <sys:String x:Key="S.Splash.Downloading">Downloading {0}…</sys:String>
     <sys:String x:Key="S.Splash.Installing">Installing update…</sys:String>
+    <sys:String x:Key="S.Update.NeedPerm">Permission needed</sys:String>
+    <sys:String x:Key="S.Update.NeedPermDesc">The update needs administrator permission (just this once).</sys:String>
 
     <sys:String x:Key="S.News.Nse.Title">NSE6 is out now</sys:String>
     <sys:String x:Key="S.News.Nse.Desc">Check out what's new in the series.</sys:String>

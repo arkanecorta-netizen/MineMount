@@ -2,8 +2,7 @@
 bin/
 obj/
 Publish/
-Publish118/
-Publish119/
+Publish*/
 publish/
 Output/
 *.user

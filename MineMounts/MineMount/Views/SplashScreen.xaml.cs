@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -84,38 +85,67 @@ public partial class SplashScreen : Window
         var completedWeight = 0.0;
         var currentProgress = 0.0;
 
-        foreach (var (label, weight, work) in steps)
+        // 1. Configuración (rápido, primero)
+        (completedWeight, currentProgress) = await RunOneAsync(
+            steps[0], totalWeight, completedWeight, SetStatus);
+
+        // 2-4. Red en paralelo (updates + series + noticias): el máximo
+        // manda en vez de la suma → el arranque baja de ~9s a ~4s.
+        var mid = new[] { steps[1], steps[2], steps[3] };
+        var frac = new double[mid.Length];
+        var running = new System.Collections.Generic.List<Task>();
+        for (var i = 0; i < mid.Length; i++)
         {
-            if (_stopwatch.ElapsedMilliseconds >= MaxDurationMs)
+            var idx = i;
+            var (label, weight, work) = mid[idx];
+            running.Add(Task.Run(async () =>
             {
-                _logService.Warning("Pantalla de carga: se alcanzó el tiempo máximo");
-                break;
-            }
+                // SetStatus toca la UI: volver al hilo del Dispatcher
+                Dispatcher.Invoke(() => SetStatus(label));
+                _logService.Info($"Splash: {label}");
 
-            SetStatus(label);
-            _logService.Info($"Splash: {label}");
+                var progress = new Progress<double>(p => frac[idx] = p);
+                try
+                {
+                    await work(progress);
+                }
+                catch (Exception ex)
+                {
+                    _logService.Error($"Splash step failed: {label}", ex);
+                }
 
-            var stepProgress = 0.0;
-            var progress = new Progress<double>(p => stepProgress = p);
+                if (frac[idx] < 100)
+                    await AnimateStepProgress(() => frac[idx], p => frac[idx] = p, 200);
+                frac[idx] = 100;
+            }));
+        }
 
-            try
-            {
-                await work(progress);
-            }
-            catch (Exception ex)
-            {
-                _logService.Error($"Splash step failed: {label}", ex);
-            }
-
-            // Asegurar que el paso llega al 100% aunque no lo reporte
-            if (stepProgress < 100)
-            {
-                await AnimateStepProgress(() => stepProgress, p => stepProgress = p, 300);
-            }
-
-            completedWeight += weight;
-            currentProgress = completedWeight * 100.0 / totalWeight;
+        var midWeight = mid.Sum(s => s.Weight);
+        while (running.Any(t => !t.IsCompleted))
+        {
+            if (_stopwatch.ElapsedMilliseconds >= MaxDurationMs) break;
+            var done = 0.0;
+            for (var i = 0; i < mid.Length; i++) done += frac[i] * mid[i].Weight / 100.0;
+            currentProgress = (completedWeight + done) * 100.0 / totalWeight;
             UpdateProgress(currentProgress);
+            await Task.Delay(100);
+        }
+        await Task.WhenAll(running);
+        completedWeight += midWeight;
+        currentProgress = completedWeight * 100.0 / totalWeight;
+        UpdateProgress(currentProgress);
+
+        // 5-6. Recursos + cierre (secuenciales)
+        (completedWeight, currentProgress) = await RunOneAsync(
+            steps[4], totalWeight, completedWeight, SetStatus);
+        if (_stopwatch.ElapsedMilliseconds < MaxDurationMs)
+        {
+            (completedWeight, currentProgress) = await RunOneAsync(
+                steps[5], totalWeight, completedWeight, SetStatus);
+        }
+        else
+        {
+            _logService.Warning("Pantalla de carga: se alcanzó el tiempo máximo");
         }
 
         // Espera asíncrona hasta la duración mínima (la UI sigue viva)
@@ -178,10 +208,14 @@ public partial class SplashScreen : Window
             return;
         }
 
-        SetStatus(Services.Loc.Tf("S.Splash.Downloading", $"v{_updateService.LatestVersion}"));
+        // CheckUpdatesAsync puede correr en un hilo de fondo (pasos en
+        // paralelo): todo acceso a la UI va por el Dispatcher.
+        void UiStatus(string text) => Dispatcher.Invoke(() => SetStatus(text));
+
+        UiStatus(Services.Loc.Tf("S.Splash.Downloading", $"v{_updateService.LatestVersion}"));
         var downloadProgress = new Progress<double>(p =>
         {
-            SetStatus(Services.Loc.Tf("S.Splash.Downloading", $"v{_updateService.LatestVersion} {p:F0}%"));
+            UiStatus(Services.Loc.Tf("S.Splash.Downloading", $"v{_updateService.LatestVersion} {p:F0}%"));
             progress.Report(p);
         });
 
@@ -195,10 +229,11 @@ public partial class SplashScreen : Window
             return;
         }
 
-        SetStatus(Services.Loc.T("S.Splash.Installing"));
+        UiStatus(Services.Loc.T("S.Splash.Installing"));
         progress.Report(95);
 
-        if (!_updateService.ApplyAndRestart())
+        // Shutdown debe correr en el hilo UI aunque este paso vaya en fondo
+        if (!Dispatcher.Invoke(() => _updateService.ApplyAndRestart()))
         {
             _logService.Warning(
                 $"Splash: no se pudo aplicar ({_updateService.LastError}); se continúa");
@@ -253,6 +288,38 @@ public partial class SplashScreen : Window
     // ---------------------------------------------------------------
     //  Utilidades de progreso
     // ---------------------------------------------------------------
+    private async Task<(double CompletedWeight, double CurrentProgress)> RunOneAsync(
+        (string Label, double Weight, Func<IProgress<double>, Task> Work) step,
+        double totalWeight, double completedWeight,
+        Action<string> setStatus)
+    {
+        var stepProgress = 0.0;
+        var progress = new Progress<double>(p => stepProgress = p);
+
+        setStatus(step.Label);
+        _logService.Info($"Splash: {step.Label}");
+
+        try
+        {
+            await step.Work(progress);
+        }
+        catch (Exception ex)
+        {
+            _logService.Error($"Splash step failed: {step.Label}", ex);
+        }
+
+        // Asegurar que el paso llega al 100% aunque no lo reporte
+        if (stepProgress < 100)
+        {
+            await AnimateStepProgress(() => stepProgress, p => stepProgress = p, 300);
+        }
+
+        completedWeight += step.Weight;
+        var currentProgress = completedWeight * 100.0 / totalWeight;
+        UpdateProgress(currentProgress);
+        return (completedWeight, currentProgress);
+    }
+
     private async Task AnimateStepProgress(Func<double> get, Action<double> set, int durationMs)
     {
         var start = get();
