@@ -7,12 +7,14 @@
 
     <!-- Fondo a pantalla completa: color sólido de fallback + 2 capas para
          crossfade + overlay degradado (85% abajo → 15% arriba) + tinte morado 8% -->
-    <Grid Background="{StaticResource BaseBackgroundBrush}">
+    <Grid Background="{DynamicResource BaseBackgroundBrush}">
         <Image x:Name="ImageA"
                Stretch="UniformToFill"
-               RenderOptions.BitmapScalingMode="HighQuality"
-               CacheMode="BitmapCache"
+               RenderOptions.BitmapScalingMode="Linear"
                Opacity="1">
+            <Image.Effect>
+                <BlurEffect x:Name="BlurA" Radius="0" />
+            </Image.Effect>
             <Image.RenderTransform>
                 <ScaleTransform x:Name="ZoomA" ScaleX="1" ScaleY="1" />
             </Image.RenderTransform>
@@ -20,9 +22,11 @@
         </Image>
         <Image x:Name="ImageB"
                Stretch="UniformToFill"
-               RenderOptions.BitmapScalingMode="HighQuality"
-               CacheMode="BitmapCache"
+               RenderOptions.BitmapScalingMode="Linear"
                Opacity="0">
+            <Image.Effect>
+                <BlurEffect x:Name="BlurB" Radius="0" />
+            </Image.Effect>
             <Image.RenderTransform>
                 <ScaleTransform x:Name="ZoomB" ScaleX="1" ScaleY="1" />
             </Image.RenderTransform>
@@ -30,8 +34,10 @@
         </Image>
 
         <!-- Overlay degradado oscuro de legibilidad -->
-        <Border Background="{StaticResource BackgroundScrimBrush}" />
+        <Border Background="{DynamicResource BackgroundScrimBrush}" />
         <!-- Tinte morado sutil de marca -->
-        <Border Background="{StaticResource BrandTintBrush}" />
+        <Border Background="{DynamicResource BrandTintBrush}" />
+        <!-- Oscurecido extra configurable (0-80%) -->
+        <Border x:Name="DimLayer" Background="Black" Opacity="0.25" />
     </Grid>
 </UserControl>

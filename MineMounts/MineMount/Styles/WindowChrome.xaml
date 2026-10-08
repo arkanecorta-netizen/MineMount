@@ -6,7 +6,7 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Width" Value="46" />
-        <Setter Property="Foreground" Value="{StaticResource ForegroundSecondaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundSecondaryBrush}" />
         <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
         <Setter Property="FontSize" Value="10" />
         <Setter Property="Cursor" Value="Hand" />
@@ -19,10 +19,10 @@
                             BorderThickness="{TemplateBinding BorderThickness}">
                         <Grid>
                             <Border x:Name="hoverLayer"
-                                    Background="{StaticResource BackgroundHoverBrush}"
+                                    Background="{DynamicResource BackgroundHoverBrush}"
                                     Opacity="0" />
                             <Border x:Name="pressLayer"
-                                    Background="{StaticResource BackgroundPressedBrush}"
+                                    Background="{DynamicResource BackgroundPressedBrush}"
                                     Opacity="0" />
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
@@ -31,7 +31,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Foreground" Value="{StaticResource ForegroundPrimaryBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}" />
                             <Trigger.EnterActions>
                                 <BeginStoryboard>
                                     <Storyboard>
@@ -93,10 +93,10 @@
                             BorderThickness="{TemplateBinding BorderThickness}">
                         <Grid>
                             <Border x:Name="hoverLayer"
-                                    Background="{StaticResource AccentPrimaryBrush}"
+                                    Background="{DynamicResource AccentPrimaryBrush}"
                                     Opacity="0" />
                             <Border x:Name="pressLayer"
-                                    Background="{StaticResource AccentPressedBrush}"
+                                    Background="{DynamicResource AccentPressedBrush}"
                                     Opacity="0" />
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
@@ -159,8 +159,8 @@
 
     <!-- Toggle Button -->
     <Style x:Key="ToggleButton.Base" TargetType="ToggleButton">
-        <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}" />
-        <Setter Property="Foreground" Value="{StaticResource ForegroundSecondaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource BackgroundTertiaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundSecondaryBrush}" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Padding" Value="12,8" />
         <Setter Property="Cursor" Value="Hand" />
@@ -178,11 +178,11 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource BackgroundHoverBrush}" />
-                            <Setter Property="Foreground" Value="{StaticResource ForegroundPrimaryBrush}" />
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource BackgroundHoverBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource AccentPrimaryBrush}" />
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource AccentPrimaryBrush}" />
                             <Setter Property="Foreground" Value="White" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -193,9 +193,9 @@
 
     <!-- Tooltip (implicit) -->
     <Style TargetType="ToolTip">
-        <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}" />
-        <Setter Property="Foreground" Value="{StaticResource ForegroundPrimaryBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource BorderPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource BackgroundTertiaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ForegroundPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderPrimaryBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="10,6" />
         <Setter Property="FontSize" Value="{StaticResource FontSizeSM}" />

@@ -142,6 +142,18 @@
         <GradientStop Color="#FF22D3EE" Offset="1" />
     </LinearGradientBrush>
 
+    <!-- Estado de error del botón JUGAR: rojo -->
+    <LinearGradientBrush x:Key="DangerGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FFF87171" Offset="0" />
+        <GradientStop Color="#FFDC2626" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Estado "jugando": verde sobrio -->
+    <LinearGradientBrush x:Key="SuccessGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FF22C55E" Offset="0" />
+        <GradientStop Color="#FF15803D" Offset="1" />
+    </LinearGradientBrush>
+
     <!-- Gradiente principal anterior (compatibilidad) -->
     <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="{StaticResource AccentPrimaryColor}" Offset="0" />
@@ -154,12 +166,12 @@
         <GradientStop Color="{StaticResource RosePrimaryColor}" Offset="1" />
     </LinearGradientBrush>
 
-    <!-- Scrim de legibilidad: ~85% negro abajo → ~15% arriba -->
+    <!-- Scrim de legibilidad: presente abajo pero liviano para que el fondo respire -->
     <LinearGradientBrush x:Key="BackgroundScrimBrush" StartPoint="0,1" EndPoint="0,0">
-        <GradientStop Color="#D9000000" Offset="0" />
-        <GradientStop Color="#A6000000" Offset="0.35" />
-        <GradientStop Color="#59000000" Offset="0.65" />
-        <GradientStop Color="#26000000" Offset="1" />
+        <GradientStop Color="#B3000000" Offset="0" />
+        <GradientStop Color="#7A000000" Offset="0.35" />
+        <GradientStop Color="#33000000" Offset="0.65" />
+        <GradientStop Color="#1A000000" Offset="1" />
     </LinearGradientBrush>
 
     <!-- Tinte morado sutil de marca sobre el fondo -->

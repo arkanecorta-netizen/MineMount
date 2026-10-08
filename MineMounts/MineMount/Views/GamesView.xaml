@@ -46,7 +46,7 @@
                              Margin="0,8,0,0">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{StaticResource BackgroundCardBrush}"
+                                <Border Background="{DynamicResource BackgroundCardBrush}"
                                         CornerRadius="8"
                                         Padding="16,12"
                                         Margin="0,4">
@@ -92,7 +92,7 @@
                              Margin="0,8,0,0">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{StaticResource BackgroundCardBrush}"
+                                <Border Background="{DynamicResource BackgroundCardBrush}"
                                         CornerRadius="8"
                                         Padding="16,12"
                                         Margin="0,4">

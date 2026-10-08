@@ -1,24 +1,41 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Animation;
 
 namespace MineMount.Views;
 
 public partial class HomeView : UserControl
 {
-    private const double ScrollStep = 300;
-
     public HomeView()
     {
         InitializeComponent();
+        Loaded += (_, _) => PlayEntrance();
     }
 
-    private void ScrollNewsLeft(object sender, RoutedEventArgs e)
+    /// <summary>Entrada fade + slide de 12px (se omite si las animaciones están off).</summary>
+    private void PlayEntrance()
     {
-        NewsScroller?.ScrollToHorizontalOffset(NewsScroller.HorizontalOffset - ScrollStep);
-    }
+        bool enabled = true;
+        try
+        {
+            enabled = App.GetService<Services.ISettingsService>()
+                .GetSettingsAsync().GetAwaiter().GetResult().EnableAnimations;
+        }
+        catch
+        {
+            // Sin configuración: animar igual
+        }
 
-    private void ScrollNewsRight(object sender, RoutedEventArgs e)
-    {
-        NewsScroller?.ScrollToHorizontalOffset(NewsScroller.HorizontalOffset + ScrollStep);
+        if (!enabled || HeroPanel == null) return;
+
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var duration = TimeSpan.FromMilliseconds(300);
+        HeroPanel.Opacity = 0;
+        HeroPanel.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
+        HeroSlide.Y = 12;
+        HeroSlide.BeginAnimation(
+            System.Windows.Media.TranslateTransform.YProperty,
+            new DoubleAnimation(12, 0, duration) { EasingFunction = ease });
     }
 }

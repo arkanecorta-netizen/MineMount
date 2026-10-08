@@ -18,18 +18,18 @@ namespace MineMount.Views;
 /// </summary>
 public partial class AnimatedBackground : UserControl
 {
-    private static readonly TimeSpan HoldTime = TimeSpan.FromSeconds(8);
     private static readonly Duration Crossfade = new(TimeSpan.FromSeconds(1.5));
-    private static readonly Duration KenBurns = new(TimeSpan.FromSeconds(8));
 
     private readonly DispatcherTimer _timer;
     private readonly Random _random = new();
+    private readonly List<Uri> _playlist = new();
     private int _current = -1;
     private bool _showingB;
     private bool _isPaused;
     private bool _animationsEnabled = true;
     private string _mode = "Auto";
     private int _fixedIndex;
+    private int _intervalSeconds = 8;
 
     public bool IsPaused
     {
@@ -54,20 +54,97 @@ public partial class AnimatedBackground : UserControl
     public AnimatedBackground()
     {
         InitializeComponent();
-        _timer = new DispatcherTimer { Interval = HoldTime };
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
         _timer.Tick += (_, _) => Advance();
         Loaded += (_, _) => ApplyMode(initial: true);
         Unloaded += (_, _) => _timer.Stop();
     }
 
-    /// <summary>Configura el modo desde los ajustes (Auto/Fijo/Desactivado).</summary>
-    public void Configure(string mode, int fixedIndex, bool animationsEnabled)
+    /// <summary>Configura el fondo desde los ajustes (todo en vivo).</summary>
+    public void Configure(
+        string mode, int fixedIndex, bool animationsEnabled,
+        int intervalSeconds, int dimPercent, int blurRadius,
+        System.Collections.Generic.IEnumerable<string>? customBackgrounds)
     {
         _mode = string.IsNullOrWhiteSpace(mode) ? "Auto" : mode;
         _fixedIndex = Math.Max(0, fixedIndex);
         _animationsEnabled = animationsEnabled;
+        _intervalSeconds = Math.Clamp(intervalSeconds, 2, 20);
+        _timer.Interval = TimeSpan.FromSeconds(_intervalSeconds);
+
+        DimLayer.Opacity = Math.Clamp(dimPercent, 0, 80) / 100.0;
+
+        // Sin blur no se aplica efecto (un BlurEffect en 0 igual cuesta GPU)
+        var blur = Math.Clamp(blurRadius, 0, 20);
+        ImageA.Effect = blur > 0 ? BlurA : null;
+        ImageB.Effect = blur > 0 ? BlurB : null;
+        BlurA.Radius = blur;
+        BlurB.Radius = blur;
+
+        if (_playlist.Count == 0)
+            RebuildPlaylist(customBackgrounds);
         if (!IsLoaded) return;
         ApplyMode(initial: false);
+    }
+
+    /// <summary>Compatibilidad: configuración básica.</summary>
+    public void Configure(string mode, int fixedIndex, bool animationsEnabled)
+        => Configure(mode, fixedIndex, animationsEnabled, 8, 25, 0, null);
+
+    private void RebuildPlaylist(System.Collections.Generic.IEnumerable<string>? customs)
+    {
+        _playlist.Clear();
+        foreach (var item in Services.BackgroundCatalog.Items)
+        {
+            try
+            {
+                _playlist.Add(new Uri(item.PackUri, UriKind.Absolute));
+            }
+            catch
+            {
+                // Entrada inválida: se saltea
+            }
+        }
+
+        if (customs != null)
+        {
+            foreach (var path in customs)
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(path)) continue;
+                    var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+                    if (ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".bmp" && ext != ".webp")
+                        continue;
+                    if (!System.IO.File.Exists(path)) continue;
+                    _playlist.Add(new Uri(path, UriKind.Absolute));
+                }
+                catch
+                {
+                    // Imagen propia inválida: se saltea
+                }
+            }
+        }
+
+        if (_playlist.Count == 0)
+        {
+            try
+            {
+                _playlist.Add(new Uri("pack://application:,,,/Assets/MineMount/banner.png", UriKind.Absolute));
+            }
+            catch
+            {
+                // Sin imágenes: queda el color sólido
+            }
+        }
+    }
+
+    private Uri PlaylistUriAt(int index)
+    {
+        if (_playlist.Count == 0)
+            return Services.BackgroundCatalog.UriAt(0);
+        var safe = ((index % _playlist.Count) + _playlist.Count) % _playlist.Count;
+        return _playlist[safe];
     }
 
     private void ApplyMode(bool initial)
@@ -98,7 +175,9 @@ public partial class AnimatedBackground : UserControl
         // Rotación automática
         if (initial || _current < 0)
         {
-            _current = _random.Next(Services.BackgroundCatalog.Items.Count);
+            if (_playlist.Count == 0)
+                RebuildPlaylist(null);
+            _current = _playlist.Count > 0 ? _random.Next(_playlist.Count) : 0;
             SetImage(ImageA, _current);
             ImageA.Opacity = 1;
             ImageB.Opacity = 0;
@@ -111,31 +190,33 @@ public partial class AnimatedBackground : UserControl
     private void UpdateTimer()
     {
         var auto = !string.Equals(_mode, "Desactivado", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(_mode, "Fijo", StringComparison.OrdinalIgnoreCase);
-        _timer.IsEnabled = auto && !_isPaused && _animationsEnabled && IsLoaded;
-        if (!auto || _isPaused || !_animationsEnabled) return;
-        if (!_timer.IsEnabled) _timer.Start();
+            && !string.Equals(_mode, "Off", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(_mode, "Fijo", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(_mode, "Fixed", StringComparison.OrdinalIgnoreCase);
+        if (auto && !_isPaused && _animationsEnabled && IsLoaded)
+            _timer.Start();
+        else
+            _timer.Stop();
     }
 
     private void ShowFixed(int index)
     {
-        var uri = Services.BackgroundCatalog.UriAt(index);
-        _current = index;
+        if (_playlist.Count == 0) RebuildPlaylist(null);
+        _current = _playlist.Count > 0 ? index % _playlist.Count : 0;
         _showingB = false;
-        SetImage(ImageA, index);
+        SetImage(ImageA, _current);
         ImageB.Opacity = 0;
         ImageA.Opacity = 1;
         // Sin animación en modo fijo: zoom leve estático (barato, sin storyboard).
         ZoomA.ScaleX = 1.04;
         ZoomA.ScaleY = 1.04;
-        _ = uri;
     }
 
     private void Advance()
     {
-        if (_isPaused || !_animationsEnabled) return;
+        if (_isPaused || !_animationsEnabled || _playlist.Count == 0) return;
 
-        var next = (_current + 1) % Services.BackgroundCatalog.Items.Count;
+        var next = (_current + 1) % _playlist.Count;
         _current = next;
 
         var fadeIn = _showingB ? ImageA : ImageB;
@@ -169,18 +250,19 @@ public partial class AnimatedBackground : UserControl
         if (!_animationsEnabled) return;
         zoom.ScaleX = 1.0;
         zoom.ScaleY = 1.0;
+        var duration = new Duration(TimeSpan.FromSeconds(_intervalSeconds));
         var easing = new QuadraticEase { EasingMode = EasingMode.EaseInOut };
         zoom.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,
-            new DoubleAnimation(1.0, 1.08, KenBurns) { EasingFunction = easing });
+            new DoubleAnimation(1.0, 1.08, duration) { EasingFunction = easing });
         zoom.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,
-            new DoubleAnimation(1.0, 1.08, KenBurns) { EasingFunction = easing });
+            new DoubleAnimation(1.0, 1.08, duration) { EasingFunction = easing });
     }
 
-    private static void SetImage(Image target, int index)
+    private void SetImage(Image target, int index)
     {
         try
         {
-            var uri = Services.BackgroundCatalog.UriAt(index);
+            var uri = PlaylistUriAt(index);
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
             bitmap.UriSource = uri;

@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="800">
+             d:DesignHeight="600" d:DesignWidth="900">
 
     <UserControl.Resources>
         <Style x:Key="BackgroundThumb" TargetType="ListBoxItem">
@@ -18,17 +18,17 @@
                                 Width="128" Height="72"
                                 CornerRadius="10"
                                 ClipToBounds="True"
-                                BorderBrush="{StaticResource GlassBorderBrush}"
+                                BorderBrush="{DynamicResource GlassBorderBrush}"
                                 BorderThickness="1"
-                                Background="{StaticResource ThumbFallbackBrush}">
+                                Background="{DynamicResource ThumbFallbackBrush}">
                             <ContentPresenter />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ThumbBorder" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
+                                <Setter TargetName="ThumbBorder" Property="BorderBrush" Value="{DynamicResource AccentPrimaryBrush}" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ThumbBorder" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
+                                <Setter TargetName="ThumbBorder" Property="BorderBrush" Value="{DynamicResource AccentPrimaryBrush}" />
                                 <Setter TargetName="ThumbBorder" Property="BorderThickness" Value="2" />
                                 <Setter TargetName="ThumbBorder" Property="Effect" Value="{StaticResource ShadowGlow}" />
                             </Trigger>
@@ -37,329 +37,535 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="SectionNavButton" TargetType="Button" BasedOn="{StaticResource Button.Nav}">
+            <Setter Property="FontSize" Value="13" />
+        </Style>
     </UserControl.Resources>
 
-    <Grid Margin="28,16,28,20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <Grid>
+        <!-- Overlay fuerte detrás del contenido -->
+        <Border>
+            <Border.Background>
+                <SolidColorBrush Color="#BF08080C" />
+            </Border.Background>
+        </Border>
 
-        <TextBlock Grid.Row="0"
-                   Text="CONFIGURACIÓN"
-                   Style="{StaticResource TextBlock.Title}" />
+        <Grid Margin="28,16,28,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" MinHeight="0" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="190" />
+                <ColumnDefinition Width="*" MinWidth="0" />
+            </Grid.ColumnDefinitions>
 
-        <ScrollViewer Grid.Row="1"
-                      Margin="0,16,0,0"
-                      VerticalScrollBarVisibility="Auto">
-            <StackPanel MaxWidth="860">
-
-                <!-- Cuenta -->
-                <Border Style="{StaticResource Card}"
-                        Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="CUENTA"
-                                   Style="{StaticResource TextBlock.Heading}"
-                                   Margin="0,0,0,12" />
-
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0"
-                                        Visibility="{Binding IsLoggedIn, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                                <TextBlock Text="Email"
-                                           Style="{StaticResource TextBlock.Secondary}"
-                                           Margin="0,0,0,4" />
-                                <TextBox Width="250"
-                                         Style="{StaticResource TextBox.Base}"
-                                         Text="{Binding Email}"
-                                         HorizontalAlignment="Left" />
-                                <TextBlock Text="Contraseña"
-                                           Style="{StaticResource TextBlock.Secondary}"
-                                           Margin="0,12,0,4" />
-                                <PasswordBox Width="250"
-                                             Style="{StaticResource PasswordBox.Base}"
-                                             HorizontalAlignment="Left" />
-                                <Button Content="Iniciar Sesión"
-                                        Style="{StaticResource Button.Primary}"
-                                        Command="{Binding LoginCommand}"
-                                        Margin="0,16,0,0"
-                                        HorizontalAlignment="Left" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="0"
-                                        Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <TextBlock Text="{Binding UserName}"
-                                           Style="{StaticResource TextBlock.Heading}" />
-                                <TextBlock Text="{Binding Email}"
-                                           Style="{StaticResource TextBlock.Secondary}"
-                                           Margin="0,4,0,0" />
-                                <TextBlock Text="{Binding LastLogin, StringFormat='Último acceso: {0:g}'}"
-                                           Style="{StaticResource TextBlock.Muted}"
-                                           Margin="0,4,0,0" />
-                                <Button Content="Cerrar Sesión"
-                                        Style="{StaticResource Button.Secondary}"
-                                        Command="{Binding LogoutCommand}"
-                                        Margin="0,16,0,0"
-                                        HorizontalAlignment="Left" />
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <!-- Juego -->
-                <Border Style="{StaticResource Card}"
-                        Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="JUEGO"
-                                   Style="{StaticResource TextBlock.Heading}"
-                                   Margin="0,0,0,12" />
-
-                        <TextBlock Text="RAM Asignada (MB)"
-                                   Style="{StaticResource TextBlock.Secondary}"
-                                   Margin="0,0,0,4" />
-                        <Slider Minimum="{Binding MinRAM}"
-                                Maximum="{Binding MaxRAM}"
-                                Value="{Binding AllocatedRAM}"
-                                Style="{StaticResource Slider.Base}"
-                                Width="300"
-                                HorizontalAlignment="Left"
-                                TickFrequency="512"
-                                IsSnapToTickEnabled="True" />
-                        <TextBlock Text="{Binding AllocatedRAM, StringFormat='{}{0} MB'}"
-                                   Style="{StaticResource TextBlock.Accent}"
-                                   FontWeight="SemiBold"
-                                   Margin="0,4,0,12" />
-
-                        <TextBlock Text="Ruta de Java"
-                                   Style="{StaticResource TextBlock.Secondary}"
-                                   Margin="0,0,0,4" />
-                        <StackPanel Orientation="Horizontal">
-                            <TextBox Width="300"
-                                     Style="{StaticResource TextBox.Base}"
-                                     Text="{Binding JavaPath}"
-                                     VerticalContentAlignment="Center" />
-                            <Button Content="..."
-                                    Style="{StaticResource Button.Secondary}"
-                                    Command="{Binding BrowseJavaPathCommand}"
-                                    Margin="8,0,0,0"
-                                    Padding="12,8" />
-                        </StackPanel>
-
-                        <TextBlock Text="Directorio del Juego"
-                                   Style="{StaticResource TextBlock.Secondary}"
-                                   Margin="0,12,0,4" />
-                        <StackPanel Orientation="Horizontal">
-                            <TextBox Width="300"
-                                     Style="{StaticResource TextBox.Base}"
-                                     Text="{Binding GameDirectory}"
-                                     VerticalContentAlignment="Center" />
-                            <Button Content="..."
-                                    Style="{StaticResource Button.Secondary}"
-                                    Command="{Binding BrowseGameDirectoryCommand}"
-                                    Margin="8,0,0,0"
-                                    Padding="12,8" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Series -->
-                <Border Style="{StaticResource Card}"
-                        Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="SERIES"
-                                   Style="{StaticResource TextBlock.Heading}"
-                                   Margin="0,0,0,12" />
-
-                        <TextBlock Text="Carpeta de instalación de series"
-                                   Style="{StaticResource TextBlock.Secondary}"
-                                   Margin="0,0,0,4" />
-                        <TextBox Width="420"
-                                 Style="{StaticResource TextBox.Base}"
-                                 Text="{Binding SeriesInstallPath}"
-                                 VerticalContentAlignment="Center"
-                                 HorizontalAlignment="Left"
-                                 AutomationProperties.Name="Carpeta de instalación de series" />
-                        <TextBlock Text="Vacío usa la predeterminada: %APPDATA%\MineMount\Series"
-                                   Style="{StaticResource TextBlock.Muted}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,4,0,0" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Fondo -->
-                <Border Style="{StaticResource Card}"
-                        Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="FONDO"
-                                   Style="{StaticResource TextBlock.Heading}"
-                                   Margin="0,0,0,12" />
-
-                        <TextBlock Text="Modo de fondo"
-                                   Style="{StaticResource TextBlock.Secondary}"
-                                   Margin="0,0,0,4" />
-                        <ComboBox Width="260"
-                                  Style="{StaticResource ComboBox.Base}"
-                                  SelectedValuePath="Tag"
-                                  SelectedValue="{Binding BackgroundMode, Mode=TwoWay}"
-                                  AutomationProperties.Name="Modo de fondo"
-                                  HorizontalAlignment="Left">
-                            <ComboBoxItem Content="Rotación automática (8 s)" Tag="Auto" />
-                            <ComboBoxItem Content="Fondo fijo" Tag="Fijo" />
-                            <ComboBoxItem Content="Desactivado (PCs flojas)" Tag="Desactivado" />
-                        </ComboBox>
-                        <TextBlock Text="Las imágenes vienen incluidas en el launcher: funciona sin internet. Si alguna falla, se usa el color base #0B0B0F."
-                                   Style="{StaticResource TextBlock.Muted}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,6,0,0" />
-
-                        <StackPanel Margin="0,14,0,0">
-                            <StackPanel.Style>
-                                <Style TargetType="StackPanel">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding BackgroundMode}" Value="Fijo">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </StackPanel.Style>
-                            <TextBlock Text="Elegí el fondo fijo"
-                                       Style="{StaticResource TextBlock.Secondary}"
-                                       Margin="0,0,0,8" />
-                            <ListBox SelectedIndex="{Binding SelectedBackground, Mode=TwoWay}"
-                                     Background="Transparent"
-                                     BorderThickness="0"
-                                     ItemContainerStyle="{StaticResource BackgroundThumb}"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     AutomationProperties.Name="Fondo fijo">
-                                <ListBox.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel Orientation="Horizontal" />
-                                    </ItemsPanelTemplate>
-                                </ListBox.ItemsPanel>
-                                <ListBoxItem>
-                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg1.png" Stretch="UniformToFill" />
-                                </ListBoxItem>
-                                <ListBoxItem>
-                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg2.jpg" Stretch="UniformToFill" />
-                                </ListBoxItem>
-                                <ListBoxItem>
-                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg3.jpg" Stretch="UniformToFill" />
-                                </ListBoxItem>
-                                <ListBoxItem>
-                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg4.jpg" Stretch="UniformToFill" />
-                                </ListBoxItem>
-                                <ListBoxItem>
-                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg5.jpg" Stretch="UniformToFill" />
-                                </ListBoxItem>
-                                <ListBoxItem>
-                                    <Image Source="pack://application:,,,/Assets/Backgrounds/bg6.jpg" Stretch="UniformToFill" />
-                                </ListBoxItem>
-                            </ListBox>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Apariencia -->
-                <Border Style="{StaticResource Card}"
-                        Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="APARIENCIA"
-                                   Style="{StaticResource TextBlock.Heading}"
-                                   Margin="0,0,0,12" />
-
-                        <CheckBox Content="Habilitar animaciones"
-                                  Style="{StaticResource CheckBox.Base}"
-                                  IsChecked="{Binding EnableAnimations}"
-                                  Margin="0,0,0,8" />
-                        <CheckBox Content="Partículas flotantes (polvo morado)"
-                                  Style="{StaticResource CheckBox.Base}"
-                                  IsChecked="{Binding EnableParticles}"
-                                  Margin="0,0,0,8" />
-                        <CheckBox Content="Sonido de click en botones"
-                                  Style="{StaticResource CheckBox.Base}"
-                                  IsChecked="{Binding EnableSounds}"
-                                  Margin="0,0,0,8" />
-
-                        <TextBlock Text="Tema"
-                                   Style="{StaticResource TextBlock.Secondary}"
-                                   Margin="0,12,0,4" />
-                        <ComboBox Width="150"
-                                  Style="{StaticResource ComboBox.Base}"
-                                  SelectedValuePath="Tag"
-                                  SelectedValue="{Binding Theme, Mode=TwoWay}"
-                                  AutomationProperties.Name="Tema"
-                                  HorizontalAlignment="Left">
-                            <ComboBoxItem Content="Oscuro" Tag="Dark" />
-                            <ComboBoxItem Content="Claro" Tag="Light" />
-                        </ComboBox>
-
-                        <TextBlock Text="Idioma"
-                                   Style="{StaticResource TextBlock.Secondary}"
-                                   Margin="0,12,0,4" />
-                        <ComboBox Width="150"
-                                  Style="{StaticResource ComboBox.Base}"
-                                  SelectedValuePath="Tag"
-                                  SelectedValue="{Binding Language, Mode=TwoWay}"
-                                  AutomationProperties.Name="Idioma"
-                                  HorizontalAlignment="Left">
-                            <ComboBoxItem Content="Español" Tag="es-ES" />
-                            <ComboBoxItem Content="English" Tag="en-US" />
-                        </ComboBox>
-                    </StackPanel>
-                </Border>
-
-                <!-- Launcher -->
-                <Border Style="{StaticResource Card}"
-                        Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="LAUNCHER"
-                                   Style="{StaticResource TextBlock.Heading}"
-                                   Margin="0,0,0,12" />
-
-                        <CheckBox Content="Actualizaciones automáticas"
-                                  Style="{StaticResource CheckBox.Base}"
-                                  IsChecked="{Binding AutoUpdate}"
-                                  Margin="0,0,0,8" />
-                        <CheckBox Content="Mostrar noticias"
-                                  Style="{StaticResource CheckBox.Base}"
-                                  IsChecked="{Binding ShowNews}"
-                                  Margin="0,0,0,8" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Perfiles -->
-                <Border Style="{StaticResource Card}"
-                        Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="PERFILES"
-                                   Style="{StaticResource TextBlock.Heading}"
-                                   Margin="0,0,0,12" />
-                        <Button Content="Crear Nuevo Perfil"
-                                Style="{StaticResource Button.Secondary}"
-                                Command="{Binding CreateProfileCommand}"
-                                HorizontalAlignment="Left" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Acciones -->
-                <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Right"
-                            Margin="0,4,0,8">
-                    <Button Content="Restablecer"
-                            Style="{StaticResource Button.Secondary}"
-                            Command="{Binding ResetSettingsCommand}"
-                            Margin="0,0,8,0" />
-                    <Button Content="Guardar"
-                            Style="{StaticResource Button.Primary}"
-                            Command="{Binding SaveSettingsCommand}" />
+            <!-- Encabezado -->
+            <Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
+                <TextBlock Text="{DynamicResource S.Settings.Title}"
+                           Style="{StaticResource TextBlock.Title}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StatusText}"
+                               Style="{StaticResource TextBlock.Caption}"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBlock Text="{DynamicResource S.Settings.Saved}"
+                               FontSize="12" FontWeight="SemiBold"
+                               Foreground="{DynamicResource SuccessBrush}"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding SaveNoticeVisible, Converter={StaticResource BoolToVisibilityConverter}}" />
                 </StackPanel>
+            </Grid>
 
+            <!-- Navegación de secciones -->
+            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,16,0">
+                <Button Tag="SecAccount" Click="Section_Click" Content="{DynamicResource S.Settings.Account}" Style="{StaticResource SectionNavButton}" />
+                <Button Tag="SecGame" Click="Section_Click" Content="{DynamicResource S.Settings.Game}" Style="{StaticResource SectionNavButton}" />
+                <Button Tag="SecSeries" Click="Section_Click" Content="{DynamicResource S.Settings.Series}" Style="{StaticResource SectionNavButton}" />
+                <Button Tag="SecBackground" Click="Section_Click" Content="{DynamicResource S.Settings.Background}" Style="{StaticResource SectionNavButton}" />
+                <Button Tag="SecAppearance" Click="Section_Click" Content="{DynamicResource S.Settings.Appearance}" Style="{StaticResource SectionNavButton}" />
+                <Button Tag="SecDownloads" Click="Section_Click" Content="{DynamicResource S.Settings.Downloads}" Style="{StaticResource SectionNavButton}" />
+                <Button Tag="SecDiag" Click="Section_Click" Content="{DynamicResource S.Settings.Diag}" Style="{StaticResource SectionNavButton}" />
+                <Button Tag="SecAbout" Click="Section_Click" Content="{DynamicResource S.Settings.About}" Style="{StaticResource SectionNavButton}" />
             </StackPanel>
-        </ScrollViewer>
+
+            <!-- Contenido: una sola scrollbar -->
+            <ScrollViewer Grid.Row="1" Grid.Column="1"
+                          x:Name="SectionScroller"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel MaxWidth="760" Margin="0,0,0,20">
+
+                    <!-- CUENTA -->
+                    <Border x:Name="SecAccount" Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S.Settings.Account}" Style="{StaticResource TextBlock.Heading}" />
+                            <TextBlock Text="{DynamicResource S.Settings.AccountDesc}" Foreground="#FF9CA3AF" Margin="0,4,0,14" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Grid Width="52" Height="52">
+                                    <Border CornerRadius="26" Background="{DynamicResource PlayGradientBrush}">
+                                        <TextBlock Text="{Binding AccountName, Converter={StaticResource FirstLetterConverter}}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   FontWeight="Bold" FontSize="20" Foreground="White" />
+                                    </Border>
+                                    <Border CornerRadius="26" ClipToBounds="True">
+                                        <Image Source="{Binding AccountAvatar}" Stretch="UniformToFill" />
+                                    </Border>
+                                </Grid>
+                                <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding AccountName}"
+                                               FontSize="17" FontWeight="Bold" Foreground="White" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0" VerticalAlignment="Center">
+                                        <Ellipse Width="8" Height="8"
+                                                 Fill="{DynamicResource CyanPrimaryBrush}"
+                                                 VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding AccountKindLabel}"
+                                                   FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="#FFD1D5DB"
+                                                   Margin="7,0,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                <Button Content="{DynamicResource S.Account.Change}"
+                                        Command="{Binding ChangeAccountCommand}"
+                                        Style="{StaticResource Button.Secondary}" />
+                                <Button Content="{DynamicResource S.Account.Logout}"
+                                        Command="{Binding LogoutCommand}"
+                                        Style="{StaticResource Button.Icon}"
+                                        Margin="8,0,0,0" Padding="14,8" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- JUEGO -->
+                    <Border x:Name="SecGame" Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S.Settings.Game}" Style="{StaticResource TextBlock.Heading}" />
+                            <TextBlock Text="{DynamicResource S.Settings.GameDesc}" Foreground="#FF9CA3AF" Margin="0,4,0,14" />
+
+                            <Grid>
+                                <TextBlock Text="{DynamicResource S.Game.Ram}" Style="{StaticResource TextBlock.Secondary}" />
+                                <TextBlock Text="{Binding AllocatedGB}"
+                                           HorizontalAlignment="Right" FontWeight="Bold" FontSize="14" />
+                            </Grid>
+                            <Slider Minimum="1024" Maximum="{Binding MaxRAM}"
+                                    Value="{Binding AllocatedRAM}"
+                                    Style="{StaticResource Slider.Base}"
+                                    TickFrequency="1024" IsSnapToTickEnabled="True"
+                                    Margin="0,6,0,0" />
+                            <Grid Margin="0,2,0,0">
+                                <TextBlock Text="1 GB" Style="{StaticResource TextBlock.Caption}" HorizontalAlignment="Left" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource S.Game.Recommended}"
+                                               FontSize="11" FontWeight="Bold"
+                                               Foreground="{DynamicResource CyanLightBrush}" />
+                                    <TextBlock Text="{Binding RecommendedGB}"
+                                               FontSize="11" FontWeight="Bold"
+                                               Foreground="{DynamicResource CyanLightBrush}"
+                                               Margin="6,0,0,0" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding MaxRAM, Converter={StaticResource MbToGbPlainConverter}}"
+                                           Style="{StaticResource TextBlock.Caption}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <TextBlock Style="{StaticResource TextBlock.Caption}" Margin="0,6,0,0">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource LocFormatConverter}" ConverterParameter="S.Game.RamTotal">
+                                        <Binding Path="TotalRamGB" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <TextBlock Text="{DynamicResource S.Game.RamWarn}"
+                                       Foreground="{DynamicResource WarningBrush}" FontSize="12"
+                                       TextWrapping="Wrap" Margin="0,6,0,0"
+                                       Visibility="{Binding ShowRamWarning, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <Button Content="{DynamicResource S.Game.Auto}"
+                                    Command="{Binding SetAutoRamCommand}"
+                                    Style="{StaticResource Button.Secondary}"
+                                    HorizontalAlignment="Left" Margin="0,10,0,0" Padding="16,6" />
+
+                            <TextBlock Text="{DynamicResource S.Game.Java}" Style="{StaticResource TextBlock.Secondary}" Margin="0,18,0,4" />
+                            <ComboBox ItemsSource="{Binding JavaInstalls}"
+                                      SelectedItem="{Binding SelectedJava, Mode=TwoWay}"
+                                      Style="{StaticResource ComboBox.Base}"
+                                      AutomationProperties.Name="Java">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Text="{Binding JavaDisplay}"
+                                       Style="{StaticResource TextBlock.Caption}"
+                                       TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <StackPanel Margin="0,6,0,0"
+                                        Visibility="{Binding IsDownloadingJava, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding JavaProgress, Mode=OneWay}"
+                                             Height="8" Style="{StaticResource ProgressBar.Glow}" />
+                            </StackPanel>
+                            <WrapPanel Margin="0,10,0,0">
+                                <Button Content="{DynamicResource S.Game.JavaRedetect}"
+                                        Command="{Binding DetectJavaCommand}"
+                                        Style="{StaticResource Button.Secondary}" Padding="14,6" />
+                                <Button Content="{DynamicResource S.Game.JavaManual}"
+                                        Command="{Binding BrowseJavaCommand}"
+                                        Style="{StaticResource Button.Icon}"
+                                        Margin="8,0,0,0" Padding="14,6" />
+                                <Button Content="{DynamicResource S.Game.JavaDownload}"
+                                        Command="{Binding DownloadJavaCommand}"
+                                        Style="{StaticResource Button.Primary}"
+                                        Margin="8,0,0,0" Padding="14,6" />
+                            </WrapPanel>
+
+                            <TextBlock Text="{DynamicResource S.Game.Dir}" Style="{StaticResource TextBlock.Secondary}" Margin="0,18,0,4" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox Text="{Binding GameDirectory}"
+                                         Style="{StaticResource TextBox.Base}"
+                                         Width="330" VerticalContentAlignment="Center" />
+                                <Button Content="{DynamicResource S.Game.OpenFolder}"
+                                        Command="{Binding OpenGameDirCommand}"
+                                        Style="{StaticResource Button.Secondary}"
+                                        Margin="8,0,0,0" Padding="12,6" />
+                                <Button Content="{DynamicResource S.Game.Change}"
+                                        Command="{Binding BrowseGameDirCommand}"
+                                        Style="{StaticResource Button.Icon}"
+                                        Margin="8,0,0,0" Padding="12,6" />
+                            </StackPanel>
+
+                            <CheckBox Content="{DynamicResource S.Game.CloseOnLaunch}"
+                                      IsChecked="{Binding CloseOnLaunch}"
+                                      Style="{StaticResource CheckBox.Base}" Margin="0,16,0,0" />
+                            <CheckBox Content="{DynamicResource S.Game.MinimizeOnLaunch}"
+                                      IsChecked="{Binding MinimizeOnLaunch}"
+                                      Style="{StaticResource CheckBox.Base}" Margin="0,8,0,0" />
+                            <CheckBox Content="{DynamicResource S.Game.Fullscreen}"
+                                      IsChecked="{Binding Fullscreen}"
+                                      Style="{StaticResource CheckBox.Base}" Margin="0,8,0,0" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{DynamicResource S.Game.Resolution}"
+                                           Style="{StaticResource TextBlock.Secondary}"
+                                           VerticalAlignment="Center" />
+                                <ComboBox ItemsSource="{Binding Resolutions}"
+                                          SelectedItem="{Binding Resolution, Mode=TwoWay}"
+                                          Width="140" Margin="10,0,0,0"
+                                          Style="{StaticResource ComboBox.Base}" />
+                            </StackPanel>
+
+                            <Expander Header="{DynamicResource S.Game.Jvm}" Margin="0,12,0,0"
+                                      Foreground="{DynamicResource ForegroundSecondaryBrush}">
+                                <TextBox Text="{Binding JvmArgs, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource TextBox.Base}"
+                                         AcceptsReturn="True" Height="64"
+                                         VerticalScrollBarVisibility="Auto"
+                                         FontFamily="{StaticResource FontFamilyMonospace}"
+                                         Margin="0,6,0,0" />
+                            </Expander>
+
+                            <Button Content="{DynamicResource S.Settings.Reset}"
+                                    Command="{Binding ResetGameCommand}"
+                                    Style="{StaticResource Button.Icon}"
+                                    HorizontalAlignment="Left" Margin="0,14,0,0" Padding="14,6" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- SERIES -->
+                    <Border x:Name="SecSeries" Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S.Settings.Series}" Style="{StaticResource TextBlock.Heading}" />
+                            <TextBlock Text="{DynamicResource S.Settings.SeriesDesc}" Foreground="#FF9CA3AF" Margin="0,4,0,14" />
+                            <TextBlock Text="{DynamicResource S.SeriesS.Folder}" Style="{StaticResource TextBlock.Secondary}" Margin="0,0,0,4" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox Text="{Binding SeriesInstallPath}"
+                                         Style="{StaticResource TextBox.Base}"
+                                         Width="330" VerticalContentAlignment="Center" />
+                                <Button Content="{DynamicResource S.Game.OpenFolder}"
+                                        Command="{Binding OpenSeriesFolderCommand}"
+                                        Style="{StaticResource Button.Secondary}"
+                                        Margin="8,0,0,0" Padding="12,6" />
+                                <Button Content="{DynamicResource S.SeriesS.Move}"
+                                        Command="{Binding MoveInstallationCommand}"
+                                        Style="{StaticResource Button.Icon}"
+                                        Margin="8,0,0,0" Padding="12,6" />
+                            </StackPanel>
+                            <TextBlock Text="{DynamicResource S.SeriesS.DefaultHint}"
+                                       Style="{StaticResource TextBlock.Caption}" Margin="0,4,0,0" />
+                            <TextBlock Style="{StaticResource TextBlock.Secondary}" Margin="0,10,0,0">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource LocFormatConverter}" ConverterParameter="S.SeriesS.Used">
+                                        <Binding Path="SeriesUsedSize" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <TextBlock Style="{StaticResource TextBlock.Secondary}" Margin="0,2,0,0">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource LocFormatConverter}" ConverterParameter="S.SeriesS.Free">
+                                        <Binding Path="SeriesFreeSpace" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0" VerticalAlignment="Center">
+                                <ComboBox ItemsSource="{Binding InstalledSeries}"
+                                          SelectedItem="{Binding SelectedRepairSeries, Mode=TwoWay}"
+                                          DisplayMemberPath="Name"
+                                          Width="220" Style="{StaticResource ComboBox.Base}" />
+                                <Button Content="{DynamicResource S.SeriesS.Repair}"
+                                        Command="{Binding RepairSeriesCommand}"
+                                        Style="{StaticResource Button.Primary}"
+                                        Margin="8,0,0,0" Padding="14,6" />
+                            </StackPanel>
+                            <StackPanel Margin="0,8,0,0"
+                                        Visibility="{Binding IsRepairing, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding RepairProgress, Mode=OneWay}"
+                                             Height="8" Style="{StaticResource ProgressBar.Glow}" />
+                                <TextBlock Text="{Binding RepairProgressText}"
+                                           Style="{StaticResource TextBlock.Caption}" Margin="0,4,0,0" />
+                            </StackPanel>
+                            <Button Content="{DynamicResource S.Settings.Reset}"
+                                    Command="{Binding ResetSeriesSectionCommand}"
+                                    Style="{StaticResource Button.Icon}"
+                                    HorizontalAlignment="Left" Margin="0,14,0,0" Padding="14,6" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- FONDO -->
+                    <Border x:Name="SecBackground" Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S.Settings.Background}" Style="{StaticResource TextBlock.Heading}" />
+                            <TextBlock Text="{DynamicResource S.Settings.BackgroundDesc}" Foreground="#FF9CA3AF" Margin="0,4,0,14" />
+                            <TextBlock Text="{DynamicResource S.Bg.Mode}" Style="{StaticResource TextBlock.Secondary}" Margin="0,0,0,4" />
+                            <ComboBox Width="260" HorizontalAlignment="Left"
+                                      Style="{StaticResource ComboBox.Base}"
+                                      SelectedValuePath="Tag"
+                                      SelectedValue="{Binding BackgroundMode, Mode=TwoWay}"
+                                      AutomationProperties.Name="Modo de fondo">
+                                <ComboBoxItem Content="{DynamicResource S.Bg.Auto}" Tag="Auto" />
+                                <ComboBoxItem Content="{DynamicResource S.Bg.Fixed}" Tag="Fijo" />
+                                <ComboBoxItem Content="{DynamicResource S.Bg.Off}" Tag="Desactivado" />
+                            </ComboBox>
+                            <StackPanel Margin="0,12,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding BackgroundMode}" Value="Auto">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Style="{StaticResource TextBlock.Secondary}">
+                                    <TextBlock.Text>
+                                        <MultiBinding Converter="{StaticResource LocFormatConverter}" ConverterParameter="S.Bg.Interval">
+                                            <Binding Path="BackgroundInterval" />
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
+                                <Slider Minimum="2" Maximum="20" Value="{Binding BackgroundInterval}"
+                                        Style="{StaticResource Slider.Base}"
+                                        TickFrequency="1" IsSnapToTickEnabled="True" Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Margin="0,12,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding BackgroundMode}" Value="Fijo">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8">
+                                    <TextBlock Text="{DynamicResource S.Bg.Pick}"
+                                               Style="{StaticResource TextBlock.Secondary}"
+                                               VerticalAlignment="Center" />
+                                    <Button Content="{DynamicResource S.Bg.AddMine}"
+                                            Command="{Binding AddMyImageCommand}"
+                                            Style="{StaticResource Button.Secondary}"
+                                            Margin="12,0,0,0" Padding="12,6" />
+                                </StackPanel>
+                                <ListBox SelectedIndex="{Binding SelectedBackground, Mode=TwoWay}"
+                                         ItemsSource="{Binding AvailableBackgrounds}"
+                                         Background="Transparent" BorderThickness="0"
+                                         ItemContainerStyle="{StaticResource BackgroundThumb}"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Image Source="{Binding Uri}" Stretch="UniformToFill" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource TextBlock.Secondary}" Margin="0,12,0,0">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource LocFormatConverter}" ConverterParameter="S.Bg.Dim">
+                                        <Binding Path="BackgroundDim" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <Slider Minimum="0" Maximum="80" Value="{Binding BackgroundDim}"
+                                    Style="{StaticResource Slider.Base}"
+                                    TickFrequency="5" IsSnapToTickEnabled="True" Margin="0,4,0,0" />
+                            <TextBlock Style="{StaticResource TextBlock.Secondary}" Margin="0,8,0,0">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource LocFormatConverter}" ConverterParameter="S.Bg.Blur">
+                                        <Binding Path="BackgroundBlur" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <Slider Minimum="0" Maximum="20" Value="{Binding BackgroundBlur}"
+                                    Style="{StaticResource Slider.Base}"
+                                    TickFrequency="1" IsSnapToTickEnabled="True" Margin="0,4,0,0" />
+                            <TextBlock Text="{DynamicResource S.Bg.Note}"
+                                       Style="{StaticResource TextBlock.Caption}" Margin="0,8,0,0" />
+                            <Button Content="{DynamicResource S.Settings.Reset}"
+                                    Command="{Binding ResetBackgroundCommand}"
+                                    Style="{StaticResource Button.Icon}"
+                                    HorizontalAlignment="Left" Margin="0,14,0,0" Padding="14,6" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- APARIENCIA -->
+                    <Border x:Name="SecAppearance" Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S.Settings.Appearance}" Style="{StaticResource TextBlock.Heading}" />
+                            <TextBlock Text="{DynamicResource S.Settings.AppearanceDesc}" Foreground="#FF9CA3AF" Margin="0,4,0,14" />
+                            <CheckBox Content="{DynamicResource S.Ap.Animations}"
+                                      IsChecked="{Binding EnableAnimations}"
+                                      Style="{StaticResource CheckBox.Base}" Margin="0,0,0,8" />
+                            <CheckBox Content="{DynamicResource S.Ap.Particles}"
+                                      IsChecked="{Binding EnableParticles}"
+                                      Style="{StaticResource CheckBox.Base}" Margin="0,0,0,8" />
+                            <CheckBox Content="{DynamicResource S.Ap.ClickSound}"
+                                      IsChecked="{Binding EnableSounds}"
+                                      Style="{StaticResource CheckBox.Base}" Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8"
+                                        Visibility="{Binding EnableSounds, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Style="{StaticResource TextBlock.Secondary}"
+                                           VerticalAlignment="Center" Width="110">
+                                    <TextBlock.Text>
+                                        <MultiBinding Converter="{StaticResource LocFormatConverter}" ConverterParameter="S.Ap.Volume">
+                                            <Binding Path="ClickVolume" />
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
+                                <Slider Minimum="0" Maximum="100" Value="{Binding ClickVolume}"
+                                        Width="180" Style="{StaticResource Slider.Base}"
+                                        TickFrequency="5" IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{DynamicResource S.Ap.Language}" Style="{StaticResource TextBlock.Secondary}" Margin="0,12,0,4" />
+                            <ComboBox Width="150" HorizontalAlignment="Left"
+                                      Style="{StaticResource ComboBox.Base}"
+                                      SelectedValuePath="Tag"
+                                      SelectedValue="{Binding Language, Mode=TwoWay}">
+                                <ComboBoxItem Content="{DynamicResource S.Ap.Spanish}" Tag="es-ES" />
+                                <ComboBoxItem Content="{DynamicResource S.Ap.English}" Tag="en-US" />
+                            </ComboBox>
+                            <Button Content="{DynamicResource S.Settings.Reset}"
+                                    Command="{Binding ResetAppearanceCommand}"
+                                    Style="{StaticResource Button.Icon}"
+                                    HorizontalAlignment="Left" Margin="0,14,0,0" Padding="14,6" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- DESCARGAS -->
+                    <Border x:Name="SecDownloads" Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S.Settings.Downloads}" Style="{StaticResource TextBlock.Heading}" />
+                            <TextBlock Text="{DynamicResource S.Settings.DownloadsDesc}" Foreground="#FF9CA3AF" Margin="0,4,0,14" />
+                            <TextBlock Style="{StaticResource TextBlock.Secondary}">
+                                <Run Text="{DynamicResource S.Dl.Speed}" />
+                                <Run Text=" · " />
+                                <Run Text="{Binding SpeedLabel, Mode=OneWay}" FontWeight="Bold" />
+                            </TextBlock>
+                            <Slider Minimum="0" Maximum="5000" Value="{Binding DownloadSpeedLimitKBps}"
+                                    Style="{StaticResource Slider.Base}"
+                                    TickFrequency="100" IsSnapToTickEnabled="True" Margin="0,4,0,0" />
+                            <TextBlock Style="{StaticResource TextBlock.Secondary}" Margin="0,12,0,0">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource LocFormatConverter}" ConverterParameter="S.Dl.Concurrent">
+                                        <Binding Path="MaxConcurrentDownloads" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <Slider Minimum="1" Maximum="4" Value="{Binding MaxConcurrentDownloads}"
+                                    Style="{StaticResource Slider.Base}"
+                                    TickFrequency="1" IsSnapToTickEnabled="True" Margin="0,4,0,0" />
+                            <Button Content="{DynamicResource S.Settings.Reset}"
+                                    Command="{Binding ResetDownloadsCommand}"
+                                    Style="{StaticResource Button.Icon}"
+                                    HorizontalAlignment="Left" Margin="0,14,0,0" Padding="14,6" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- DIAGNÓSTICO -->
+                    <Border x:Name="SecDiag" Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S.Settings.Diag}" Style="{StaticResource TextBlock.Heading}" />
+                            <TextBlock Text="{DynamicResource S.Settings.DiagDesc}" Foreground="#FF9CA3AF" Margin="0,4,0,14" />
+                            <TextBlock Style="{StaticResource TextBlock.Secondary}">
+                                <Run Text="Caché: " />
+                                <Run Text="{Binding CacheSize, Mode=OneWay}" FontWeight="Bold" />
+                            </TextBlock>
+                            <WrapPanel Margin="0,10,0,0">
+                                <Button Content="{DynamicResource S.Diag.ViewLogs}"
+                                        Command="{Binding ViewLogsCommand}"
+                                        Style="{StaticResource Button.Secondary}" Padding="14,6" />
+                                <Button Content="{DynamicResource S.Diag.Export}"
+                                        Command="{Binding ExportDiagnosticsCommand}"
+                                        Style="{StaticResource Button.Secondary}"
+                                        Margin="8,0,0,0" Padding="14,6" />
+                                <Button Content="{DynamicResource S.Diag.CleanCache}"
+                                        Command="{Binding CleanCacheCommand}"
+                                        Style="{StaticResource Button.Icon}"
+                                        Margin="8,0,0,0" Padding="14,6" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ACERCA DE -->
+                    <Border x:Name="SecAbout" Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S.Settings.About}" Style="{StaticResource TextBlock.Heading}" />
+                            <TextBlock Text="{DynamicResource S.Settings.AboutDesc}" Foreground="#FF9CA3AF" Margin="0,4,0,14" />
+                            <TextBlock Style="{StaticResource TextBlock.Secondary}">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource LocFormatConverter}" ConverterParameter="S.About.Version">
+                                        <Binding Path="LauncherVersion" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Content="{DynamicResource S.About.Check}"
+                                        Command="{Binding CheckUpdatesCommand}"
+                                        Style="{StaticResource Button.Secondary}" Padding="14,6" />
+                                <Button Content="{DynamicResource S.Common.UpdateNow}"
+                                        Command="{Binding UpdateNowCommand}"
+                                        Style="{StaticResource Button.Primary}"
+                                        Margin="8,0,0,0" Padding="14,6"
+                                        Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,8,0,0"
+                                        Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding UpdateProgress, Mode=OneWay}"
+                                             Height="8" Style="{StaticResource ProgressBar.Glow}" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding UpdateInfo}"
+                                       Style="{StaticResource TextBlock.Secondary}"
+                                       TextWrapping="Wrap" Margin="0,10,0,0"
+                                       Visibility="{Binding UpdateInfo, Converter={StaticResource StringToVisibilityConverter}}" />
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </UserControl>

@@ -37,6 +37,8 @@ public class SoundService : ISoundService
         {
             var settings = await _settingsService.GetSettingsAsync();
             _enabled = settings.EnableSounds;
+            if (_player != null)
+                _player.Volume = Math.Clamp(settings.ClickVolume, 0, 100) / 100.0 * 0.5;
         }
         catch
         {
@@ -50,7 +52,7 @@ public class SoundService : ISoundService
 
         try
         {
-            _player ??= new MediaPlayer { Volume = 0.25 };
+            _player ??= new MediaPlayer { Volume = 0.15 };
 
             if (!_loaded)
             {

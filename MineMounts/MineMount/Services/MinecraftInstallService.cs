@@ -38,18 +38,60 @@ public class MinecraftInstallService : IMinecraftInstallService
     };
 
     private readonly ILogService _logService;
-    private readonly string _gamesDir;
+    private readonly ISettingsService _settingsService;
 
-    public MinecraftInstallService(ILogService logService)
+    public MinecraftInstallService(ILogService logService, ISettingsService settingsService)
     {
         _logService = logService;
-        _gamesDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MineMount", "Games", "Minecraft");
-        Directory.CreateDirectory(_gamesDir);
+        _settingsService = settingsService;
+        Directory.CreateDirectory(GamesRoot());
     }
 
-    private string VersionDir(string versionId) => Path.Combine(_gamesDir, versionId);
+    /// <summary>
+    /// Raíz del runtime de Minecraft: la carpeta configurada en Juego
+    /// (por defecto %APPDATA%\.minemount) o la ubicación histórica.
+    /// </summary>
+    private string GamesRoot()
+    {
+        try
+        {
+            var configured = _settingsService.GetSettingsAsync()
+                .GetAwaiter().GetResult().GameDirectory?.Trim();
+            if (!string.IsNullOrWhiteSpace(configured))
+                return Path.Combine(configured, "Minecraft");
+        }
+        catch
+        {
+            // Configuración ilegible: ubicación histórica
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "MineMount", "Games", "Minecraft");
+    }
+
+    public static string DefaultGameDirectory()
+    {
+        // Si ya hay un runtime instalado en la ubicación histórica, se
+        // muestra esa (no se re-descarga nada). Si no, %APPDATA%\.minemount.
+        try
+        {
+            var legacy = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "MineMount", "Games");
+            if (Directory.Exists(Path.Combine(legacy, "Minecraft")))
+                return legacy;
+        }
+        catch
+        {
+            // Sin acceso: valor por defecto directo
+        }
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            ".minemount");
+    }
+
+    private string VersionDir(string versionId) => Path.Combine(GamesRoot(), versionId);
 
     // ---------------------------------------------------------------
     //  Version JSON (de Mojang, con caché local)
@@ -268,8 +310,18 @@ public class MinecraftInstallService : IMinecraftInstallService
             }
         }
 
-        // Descargar assets con concurrencia limitada
-        var semaphore = new SemaphoreSlim(4, 4);
+        // Descargar assets con concurrencia configurable
+        var maxConcurrent = 4;
+        try
+        {
+            maxConcurrent = Math.Clamp((await _settingsService.GetSettingsAsync()).MaxConcurrentDownloads, 1, 8);
+        }
+        catch
+        {
+            // Configuración ilegible: valor por defecto
+        }
+
+        var semaphore = new SemaphoreSlim(maxConcurrent, 8);
         var downloaded = 0;
         var total = objects.Count;
         var lockObj = new object();
@@ -364,12 +416,22 @@ public class MinecraftInstallService : IMinecraftInstallService
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(TimeSpan.FromMinutes(10));
 
-                using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-                resp.EnsureSuccessStatusCode();
+                using (await DownloadLimiter.AcquireAsync(cts.Token))
+                {
+                    using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                    resp.EnsureSuccessStatusCode();
 
-                await using var source = await resp.Content.ReadAsStreamAsync(cts.Token);
-                await using var target = File.Create(destPath);
-                await source.CopyToAsync(target, cts.Token);
+                    await using var source = await resp.Content.ReadAsStreamAsync(cts.Token);
+                    await using var target = File.Create(destPath);
+
+                    var buffer = new byte[81920];
+                    int read;
+                    while ((read = await source.ReadAsync(buffer, cts.Token)) > 0)
+                    {
+                        await DownloadLimiter.ThrottleAsync(read, cts.Token);
+                        await target.WriteAsync(buffer.AsMemory(0, read), cts.Token);
+                    }
+                }
 
                 return;
             }

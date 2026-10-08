@@ -13,7 +13,7 @@ namespace MineMount.Views;
 /// </summary>
 public partial class ParticlesCanvas : UserControl
 {
-    private const int ParticleCount = 26;
+    private const int ParticleCount = 14;
     private readonly Random _random = new();
     private bool _built;
 
@@ -47,12 +47,14 @@ public partial class ParticlesCanvas : UserControl
         {
             var tint = Tints[_random.Next(Tints.Length)];
             var size = 1.5 + _random.NextDouble() * 2.5;
+            var fill = new SolidColorBrush(Color.FromArgb(
+                (byte)(30 + _random.Next(55)), tint.R, tint.G, tint.B));
+            if (fill.CanFreeze) fill.Freeze();
             var ellipse = new Ellipse
             {
                 Width = size,
                 Height = size,
-                Fill = new SolidColorBrush(Color.FromArgb(
-                    (byte)(30 + _random.Next(55)), tint.R, tint.G, tint.B)),
+                Fill = fill,
                 Opacity = 0,
                 CacheMode = new BitmapCache(),
                 RenderTransform = new TranslateTransform(),

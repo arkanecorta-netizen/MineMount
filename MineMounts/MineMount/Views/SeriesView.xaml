@@ -3,106 +3,162 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:views="clr-namespace:MineMount.Views"
              xmlns:models="clr-namespace:MineMount.Models"
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="1000">
 
-    <Grid Margin="28,16,28,20">
+    <Grid Margin="28,16,28,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="0" />
         </Grid.RowDefinitions>
 
         <!-- Encabezado -->
         <Grid Grid.Row="0" Margin="0,0,0,4">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="SERIES"
-                           Style="{StaticResource TextBlock.Title}" />
+                <TextBlock Text="{DynamicResource S.Series.Title}"
+                           FontFamily="{StaticResource FontFamilyDisplay}"
+                           FontSize="28" FontWeight="Bold" Foreground="White">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="12" ShadowDepth="0" Color="#CC000000" Opacity="0.8" />
+                    </TextBlock.Effect>
+                </TextBlock>
                 <TextBlock Text="{Binding StatusText}"
-                           Style="{StaticResource TextBlock.Muted}"
+                           FontSize="13"
+                           Foreground="#FFD1D5DB"
                            VerticalAlignment="Center"
-                           Margin="16,6,0,0" />
+                           Margin="14,6,0,0">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#CC000000" Opacity="0.8" />
+                    </TextBlock.Effect>
+                </TextBlock>
             </StackPanel>
             <Button HorizontalAlignment="Right"
                     Command="{Binding RefreshCommand}"
-                    ToolTip="Actualizar series"
+                    ToolTip="{DynamicResource S.Series.Refresh}"
                     AutomationProperties.Name="Actualizar series"
-                    Style="{StaticResource Button.Icon}"
-                    Padding="8">
-                <ContentControl Content="{StaticResource IconRefresh}"
-                                Width="18" Height="18"
-                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                    Style="{StaticResource Button.Secondary}"
+                    Padding="14,8">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <ContentControl Content="{StaticResource IconRefresh}"
+                                    Width="16" Height="16"
+                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                    <TextBlock Text="{DynamicResource S.Common.Refresh}"
+                               Margin="8,0,0,0" FontWeight="SemiBold" />
+                </StackPanel>
             </Button>
         </Grid>
 
-        <!-- Grilla de tarjetas grandes -->
-        <ScrollViewer Grid.Row="1"
-                      Margin="0,12,0,0"
+        <!-- Aviso de crash: ¿ver el error? -->
+        <Border Grid.Row="1"
+                Margin="0,10,0,0" Padding="14,10" CornerRadius="12"
+                Background="#59F87171"
+                BorderBrush="{DynamicResource ErrorBrush}" BorderThickness="1"
+                Visibility="{Binding ShowCrashBanner, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ContentControl Content="{StaticResource IconWarning}"
+                                    Width="20" Height="20" VerticalAlignment="Center" />
+                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource S.Crash.Title}"
+                                   FontWeight="Bold" Foreground="White" />
+                        <TextBlock Text="{Binding CrashMessage}"
+                                   Foreground="White" Opacity="0.9"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </StackPanel>
+                <Button Grid.Column="1"
+                        Content="{DynamicResource S.Crash.View}"
+                        Command="{Binding ViewCrashLogCommand}"
+                        Style="{StaticResource Button.Secondary}"
+                        Padding="14,6" Margin="12,0,0,0" VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Command="{Binding DismissCrashCommand}"
+                        Style="{StaticResource Button.Icon}"
+                        Padding="8" Margin="6,0,0,0" VerticalAlignment="Center"
+                        ToolTip="{DynamicResource S.Common.Close}">
+                    <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Contenido: una sola scrollbar vertical -->
+        <ScrollViewer Grid.Row="2"
+                      Margin="0,12,0,0" Padding="0,0,0,16"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel>
-                <StackPanel HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Margin="0,40,0,0"
+                <StackPanel HorizontalAlignment="Center" Margin="0,40,0,0"
                             Visibility="{Binding HasSeries, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                    <TextBlock Text="No hay series disponibles"
-                               Style="{StaticResource TextBlock.Secondary}"
+                    <TextBlock Text="{DynamicResource S.Series.None}"
+                               Foreground="White" FontSize="15" FontWeight="SemiBold"
                                HorizontalAlignment="Center" />
-                    <TextBlock Text="Revisa tu conexión o actualiza el catálogo"
-                               Style="{StaticResource TextBlock.Muted}"
-                               HorizontalAlignment="Center"
-                               Margin="0,4,0,0" />
+                    <TextBlock Text="{DynamicResource S.Series.Check}"
+                               Foreground="#FFD1D5DB"
+                               HorizontalAlignment="Center" Margin="0,6,0,0" />
                 </StackPanel>
 
-                <ItemsControl ItemsSource="{Binding Series}">
+                <ItemsControl ItemsSource="{Binding Cards}"
+                              Visibility="{Binding HasSeries, Converter={StaticResource BoolToVisibilityConverter}}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" />
+                            <UniformGrid Columns="{Binding GridColumns}" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Width="300" Margin="0,0,14,14"
-                                    ClipToBounds="True">
-                                <Border.InputBindings>
-                                    <MouseBinding MouseAction="LeftClick"
-                                                  Command="{Binding DataContext.SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                  CommandParameter="{Binding}" />
-                                </Border.InputBindings>
+                            <Border x:Name="CardBorder" Margin="0,0,14,14" ClipToBounds="True">
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="CardLift" X="0" Y="0" />
+                                </Border.RenderTransform>
                                 <Border.Style>
                                     <Style TargetType="Border">
-                                        <Setter Property="Background" Value="{StaticResource GlassCardBrush}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource GlassCardBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource GlassBorderBrush}" />
                                         <Setter Property="BorderThickness" Value="1" />
                                         <Setter Property="CornerRadius" Value="14" />
-                                        <Setter Property="Effect" Value="{StaticResource ShadowMD}" />
+                                        <Setter Property="Cursor" Value="Hand" />
                                         <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
-                                                <Setter Property="Effect" Value="{StaticResource ShadowGlow}" />
-                                            </Trigger>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentPrimaryBrush}" />
+                                                <Setter Property="BorderThickness" Value="2" />
+                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
+                                <Border.InputBindings>
+                                    <MouseBinding MouseAction="LeftClick"
+                                                  Command="{Binding DataContext.SelectCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                  CommandParameter="{Binding}" />
+                                </Border.InputBindings>
                                 <StackPanel>
-                                    <!-- Arte -->
-                                    <Border Height="140" ClipToBounds="True"
+                                    <!-- Arte 16:9 -->
+                                    <Border Height="168" ClipToBounds="True"
                                             CornerRadius="14,14,0,0"
-                                            Background="{StaticResource ThumbFallbackBrush}">
+                                            Background="{DynamicResource ThumbFallbackBrush}">
                                         <Grid>
                                             <ContentControl Content="{StaticResource IconLogo}"
-                                                            Width="40" Height="40"
+                                                            Width="44" Height="44"
                                                             HorizontalAlignment="Center"
                                                             VerticalAlignment="Center"
-                                                            Opacity="0.5" />
-                                            <Image Source="{Binding Banner}" Stretch="UniformToFill">
+                                                            Opacity="0.55" />
+                                            <Image Source="{Binding Info.Banner}" Stretch="UniformToFill"
+                                                   RenderOptions.BitmapScalingMode="HighQuality">
+                                                <Image.RenderTransform>
+                                                    <ScaleTransform x:Name="ThumbZoom" ScaleX="1" ScaleY="1" />
+                                                </Image.RenderTransform>
+                                                <Image.RenderTransformOrigin>0.5,0.5</Image.RenderTransformOrigin>
                                                 <Image.Style>
                                                     <Style TargetType="Image">
                                                         <Setter Property="Visibility" Value="Visible" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Banner}" Value="">
+                                                            <DataTrigger Binding="{Binding Info.Banner}" Value="">
                                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
@@ -117,196 +173,239 @@
                                                     </LinearGradientBrush>
                                                 </Border.Background>
                                             </Border>
-                                            <!-- Logo superpuesto -->
-                                            <Border Width="52" Height="52" CornerRadius="14"
-                                                    ClipToBounds="True"
-                                                    HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                                                    Margin="14,0,0,12"
-                                                    BorderBrush="{StaticResource GlassBorderBrush}"
-                                                    BorderThickness="1"
-                                                    Background="{StaticResource GlassCardBrush}">
-                                                <Grid>
-                                                    <ContentControl Content="{StaticResource IconLogo}"
-                                                                    Width="22" Height="22"
-                                                                    HorizontalAlignment="Center"
-                                                                    VerticalAlignment="Center"
-                                                                    Opacity="0.7" />
-                                                    <Image Source="{Binding Logo}" Stretch="UniformToFill">
-                                                        <Image.Style>
-                                                            <Style TargetType="Image">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding Logo}" Value="">
-                                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Image.Style>
-                                                    </Image>
-                                                </Grid>
-                                            </Border>
-                                            <!-- Estado -->
-                                            <Border x:Name="StatusPill"
-                                                    HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                    Margin="0,12,12,0"
-                                                    CornerRadius="9999" Padding="10,4"
-                                                    Background="#38000000">
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <Ellipse x:Name="StatusDot" Width="8" Height="8"
-                                                             Fill="#FFA1A1AA" VerticalAlignment="Center" />
-                                                    <TextBlock Text="{Binding StatusText}"
-                                                               FontSize="10" FontWeight="Bold"
-                                                               Foreground="White"
-                                                               Margin="6,0,0,0" />
-                                                </StackPanel>
-                                            </Border>
+                                            <!-- Estado: punto + texto, sin píldora -->
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Top"
+                                                        HorizontalAlignment="Right" Margin="0,14,14,0">
+                                                <Ellipse x:Name="StatusDot" Width="8" Height="8"
+                                                         Fill="{DynamicResource CyanPrimaryBrush}"
+                                                         VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Info.StatusText}"
+                                                           FontSize="11" FontWeight="Bold"
+                                                           Foreground="White" Margin="7,0,0,0"
+                                                           VerticalAlignment="Center">
+                                                    <TextBlock.Effect>
+                                                        <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#CC000000" Opacity="0.85" />
+                                                    </TextBlock.Effect>
+                                                </TextBlock>
+                                            </StackPanel>
+                                            <!-- Marca de seleccionada -->
+                                            <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                       Margin="14,14,0,0"
+                                                       FontSize="11" FontWeight="Bold"
+                                                       Foreground="{DynamicResource AccentLightBrush}"
+                                                       Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <Run Text="● " /><Run Text="{DynamicResource S.Series.Selected}" />
+                                                <TextBlock.Effect>
+                                                    <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#CC000000" Opacity="0.85" />
+                                                </TextBlock.Effect>
+                                            </TextBlock>
                                         </Grid>
                                     </Border>
 
                                     <!-- Info -->
-                                    <StackPanel Margin="14,12,14,14">
-                                        <TextBlock Text="{Binding Name}"
+                                    <StackPanel Margin="16,14,16,16">
+                                        <TextBlock Text="{Binding Info.Name}"
                                                    FontFamily="{StaticResource FontFamilyDisplay}"
-                                                   FontSize="19" FontWeight="Bold"
+                                                   FontSize="20" FontWeight="Bold" Foreground="White"
                                                    TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding Description}"
-                                                   Style="{StaticResource TextBlock.Muted}"
-                                                   TextWrapping="Wrap" MaxHeight="38"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   Margin="0,4,0,0" />
-                                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                            <Border CornerRadius="9999" Padding="9,3" Margin="0,0,8,0"
-                                                    Background="{StaticResource GlassCardBrush}"
-                                                    BorderBrush="{StaticResource GlassBorderBrush}"
-                                                    BorderThickness="1">
-                                                <TextBlock FontSize="10" FontWeight="SemiBold"
-                                                           Foreground="{StaticResource CyanLightBrush}">
-                                                    <Run Text="{Binding Definition.MinecraftVersion, Mode=OneWay}" />
-                                                    <Run Text=" · " />
-                                                    <Run Text="{Binding Definition.Loader, Mode=OneWay}" />
-                                                </TextBlock>
-                                            </Border>
-                                            <Border CornerRadius="9999" Padding="9,3"
-                                                    Background="{StaticResource GlassCardBrush}"
-                                                    BorderBrush="{StaticResource GlassBorderBrush}"
-                                                    BorderThickness="1">
-                                                <TextBlock Text="{Binding Version, StringFormat=v{0}}"
-                                                           FontSize="10" FontWeight="SemiBold"
-                                                           Foreground="{StaticResource ForegroundSecondaryBrush}" />
-                                            </Border>
-                                        </StackPanel>
+                                        <TextBlock Text="{Binding McLine}"
+                                                   FontSize="12" Foreground="#FFD1D5DB"
+                                                   Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Info.Description}"
+                                                   FontSize="12" Foreground="#FFD1D5DB"
+                                                   TextWrapping="Wrap" MaxHeight="36"
+                                                   TextTrimming="CharacterEllipsis" Margin="0,6,0,0" />
 
-                                        <!-- Botón contextual -->
+                                        <!-- Changelog antes de actualizar -->
+                                        <Border Margin="0,10,0,0" Padding="12,10" CornerRadius="10"
+                                                Background="#26000000"
+                                                BorderBrush="{DynamicResource GlassBorderBrush}" BorderThickness="1"
+                                                Visibility="{Binding ShowChangelog, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding ChangelogTitle}"
+                                                           FontSize="12" FontWeight="Bold"
+                                                           Foreground="{DynamicResource AccentLightBrush}" />
+                                                <TextBlock Text="{Binding Info.Definition.Changelog}"
+                                                           FontSize="12" Foreground="#FFD1D5DB"
+                                                           TextWrapping="Wrap" MaxHeight="56"
+                                                           TextTrimming="CharacterEllipsis" Margin="0,4,0,0" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Botones contextuales -->
                                         <Grid Margin="0,12,0,0">
-                                            <Button Content="JUGAR"
-                                                    Command="{Binding DataContext.PlaySeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
-                                                    Height="40" HorizontalAlignment="Stretch">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
+                                                    Command="{Binding DataContext.PlayCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}">
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
                                                         <Setter Property="Visibility" Value="Collapsed" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.Installed}">
+                                                            <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.Installed}">
                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                                <Setter Property="Content" Value="{DynamicResource S.Play}" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <Button Content="INSTALAR"
-                                                    Command="{Binding DataContext.InstallSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
-                                                    HorizontalAlignment="Stretch" Height="40">
+                                            <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
+                                                    Command="{Binding DataContext.InstallCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}">
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
                                                         <Setter Property="Visibility" Value="Collapsed" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.NotInstalled}">
+                                                            <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.NotInstalled}">
                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                                <Setter Property="Content" Value="{DynamicResource S.Install}" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <Button Content="ACTUALIZAR"
-                                                    Command="{Binding DataContext.UpdateSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
-                                                    HorizontalAlignment="Stretch" Height="40">
+                                            <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
+                                                    Command="{Binding DataContext.UpdateCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}">
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
                                                         <Setter Property="Visibility" Value="Collapsed" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.UpdateAvailable}">
+                                                            <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.UpdateAvailable}">
                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                                <Setter Property="Content" Value="{DynamicResource S.Update}" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <Button Content="REPARAR"
-                                                    Command="{Binding DataContext.RepairSeriesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
-                                                    HorizontalAlignment="Stretch" Height="40">
+                                            <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
+                                                    Command="{Binding DataContext.RepairCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}">
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource Button.Secondary}">
                                                         <Setter Property="Visibility" Value="Collapsed" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.MissingFiles}">
+                                                            <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.MissingFiles}">
                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                                <Setter Property="Content" Value="{DynamicResource S.Repair}" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <TextBlock Text="PRÓXIMAMENTE"
-                                                       HorizontalAlignment="Center"
-                                                       FontWeight="SemiBold">
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{DynamicResource S.ComingSoon}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Foreground="#FFD1D5DB" FontWeight="SemiBold">
                                                 <TextBlock.Style>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource TextBlock.Muted}">
+                                                    <Style TargetType="TextBlock">
                                                         <Setter Property="Visibility" Value="Collapsed" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.ComingSoon}">
+                                                            <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.ComingSoon}">
                                                                 <Setter Property="Visibility" Value="Visible" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
+                                            <Button Grid.Column="1" Content="⋯"
+                                                    Click="More_Click" Tag="{Binding}"
+                                                    Style="{StaticResource Button.Secondary}"
+                                                    Height="40" Width="48" Margin="8,0,0,0"
+                                                    FontSize="18" FontWeight="Bold"
+                                                    AutomationProperties.Name="Más opciones" />
                                         </Grid>
+
+                                        <!-- Progreso de la tarjeta -->
+                                        <StackPanel Margin="0,10,0,0"
+                                                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <ProgressBar Minimum="0" Maximum="100"
+                                                         Value="{Binding Progress, Mode=OneWay}"
+                                                         Height="8"
+                                                         Style="{StaticResource ProgressBar.Glow}" />
+                                            <TextBlock Text="{Binding ProgressText}"
+                                                       FontSize="11" Foreground="#FFD1D5DB"
+                                                       Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
                             <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.Installed}">
-                                    <Setter TargetName="StatusDot" Property="Fill" Value="{StaticResource SuccessBrush}" />
-                                    <Setter TargetName="StatusPill" Property="Background" Value="#3822C55E" />
+                                <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.Installed}">
+                                    <Setter TargetName="StatusDot" Property="Fill" Value="{DynamicResource SuccessBrush}" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.UpdateAvailable}">
-                                    <Setter TargetName="StatusDot" Property="Fill" Value="{StaticResource WarningBrush}" />
-                                    <Setter TargetName="StatusPill" Property="Background" Value="#38FBBF24" />
+                                <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.UpdateAvailable}">
+                                    <Setter TargetName="StatusDot" Property="Fill" Value="{DynamicResource WarningBrush}" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.MissingFiles}">
-                                    <Setter TargetName="StatusDot" Property="Fill" Value="{StaticResource ErrorBrush}" />
-                                    <Setter TargetName="StatusPill" Property="Background" Value="#38F87171" />
+                                <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.MissingFiles}">
+                                    <Setter TargetName="StatusDot" Property="Fill" Value="{DynamicResource ErrorBrush}" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding Status}" Value="{x:Static models:SeriesStatus.NotInstalled}">
-                                    <Setter TargetName="StatusDot" Property="Fill" Value="{StaticResource CyanPrimaryBrush}" />
-                                    <Setter TargetName="StatusPill" Property="Background" Value="#3822D3EE" />
-                                </DataTrigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource AccentPrimaryBrush}" />
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="CardLift"
+                                                                  Storyboard.TargetProperty="Y"
+                                                                  To="-2" Duration="0:0:0.15" />
+                                                <DoubleAnimation Storyboard.TargetName="ThumbZoom"
+                                                                  Storyboard.TargetProperty="ScaleX"
+                                                                  To="1.08" Duration="0:0:0.25" />
+                                                <DoubleAnimation Storyboard.TargetName="ThumbZoom"
+                                                                  Storyboard.TargetProperty="ScaleY"
+                                                                  To="1.08" Duration="0:0:0.25" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="CardLift"
+                                                                  Storyboard.TargetProperty="Y"
+                                                                  To="0" Duration="0:0:0.15" />
+                                                <DoubleAnimation Storyboard.TargetName="ThumbZoom"
+                                                                  Storyboard.TargetProperty="ScaleX"
+                                                                  To="1" Duration="0:0:0.25" />
+                                                <DoubleAnimation Storyboard.TargetName="ThumbZoom"
+                                                                  Storyboard.TargetProperty="ScaleY"
+                                                                  To="1" Duration="0:0:0.25" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!-- Tarjeta vacía punteada -->
+                <Border Margin="0,2,14,0" Padding="22" CornerRadius="14"
+                        Background="Transparent"
+                        Visibility="{Binding HasSeries, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Border.BorderBrush>
+                        <SolidColorBrush Color="#44FFFFFF" />
+                    </Border.BorderBrush>
+                    <Border.BorderThickness>1</Border.BorderThickness>
+                    <Grid>
+                        <Rectangle Stroke="#66FFFFFF" StrokeThickness="1"
+                                   StrokeDashArray="8,6" RadiusX="12" RadiusY="12" />
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <ContentControl Content="{StaticResource IconSparkles}"
+                                            Width="22" Height="22" VerticalAlignment="Center"
+                                            Opacity="0.8" />
+                            <TextBlock Text="{DynamicResource S.Series.MoreSoon}"
+                                       Foreground="#FFD1D5DB" FontSize="14" FontWeight="SemiBold"
+                                       Margin="10,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </StackPanel>
         </ScrollViewer>
-
-        <!-- Detalle de la serie seleccionada -->
-        <Border Grid.Row="2"
-                Style="{StaticResource Card}"
-                Margin="0,12,0,0"
-                Padding="18"
-                MaxHeight="330">
-            <views:SeriesDetailView DataContext="{Binding Detail}" />
-        </Border>
     </Grid>
 </UserControl>

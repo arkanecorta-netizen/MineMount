@@ -4,10 +4,12 @@ using MineMount.Models;
 using MineMount.Services;
 using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace MineMount.ViewModels;
 
@@ -22,12 +24,18 @@ public enum NavigationPage
 }
 
 /// <summary>Tarjeta promocional pequeña de la barra inferior (navegación interna).</summary>
-public class PromoItem
+public partial class PromoItem : ObservableObject
 {
-    public string Title { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+    public string TitleKey { get; set; } = string.Empty;
+    public string DescriptionKey { get; set; } = string.Empty;
     public string IconKey { get; set; } = "IconSparkles";
     public string Target { get; set; } = "Series";
+
+    [ObservableProperty]
+    private string _title = string.Empty;
+
+    [ObservableProperty]
+    private string _description = string.Empty;
 }
 
 public partial class MainViewModel : ObservableObject
@@ -41,6 +49,7 @@ public partial class MainViewModel : ObservableObject
     private readonly ISeriesInstallService _installService;
     private readonly IGameLauncherService _gameLauncher;
     private readonly IAuthService _authService;
+    private readonly IAppearanceService _appearanceService;
 
     [ObservableProperty]
     private NavigationPage _currentPage = NavigationPage.Home;
@@ -120,6 +129,19 @@ public partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanPlayPrimary))]
     private bool _isPlayBusy;
 
+    // Error recuperable de la última operación (botón pasa a REINTENTAR)
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanPlayPrimary))]
+    private bool _playHasError;
+
+    [ObservableProperty]
+    private bool _playStatusIsError;
+
+    // Minecraft en ejecución (botón en estado JUGANDO, deshabilitado)
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanPlayPrimary))]
+    private bool _isGameRunning;
+
     [ObservableProperty]
     private double _playProgress;
 
@@ -129,12 +151,27 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<PromoItem> _promoItems = new();
 
+    [ObservableProperty]
+    private bool _promosCompact;
+
     // ---------- Fondo animado + partículas ----------
     [ObservableProperty]
     private string _backgroundMode = "Auto";
 
     [ObservableProperty]
     private int _selectedBackground;
+
+    [ObservableProperty]
+    private int _backgroundInterval = 8;
+
+    [ObservableProperty]
+    private int _backgroundDim = 25;
+
+    [ObservableProperty]
+    private int _backgroundBlur;
+
+    [ObservableProperty]
+    private System.Collections.Generic.List<string> _customBackgrounds = new();
 
     [ObservableProperty]
     private bool _enableParticles = true;
@@ -149,8 +186,9 @@ public partial class MainViewModel : ObservableObject
         && !string.Equals(BackgroundMode, "Desactivado", StringComparison.OrdinalIgnoreCase);
 
     public bool CanPlayPrimary => !IsPlayBusy
+        && !IsGameRunning
         && SelectedPlaySeries != null
-        && SelectedPlaySeries.Status != SeriesStatus.ComingSoon;
+        && (SelectedPlaySeries.Status != SeriesStatus.ComingSoon || PlayHasError);
 
     private readonly HomeViewModel _homeViewModel;
     private readonly GamesViewModel _gamesViewModel;
@@ -176,7 +214,8 @@ public partial class MainViewModel : ObservableObject
         ISeriesService seriesService,
         ISeriesInstallService installService,
         IGameLauncherService gameLauncher,
-        IAuthService authService)
+        IAuthService authService,
+        IAppearanceService appearanceService)
     {
         _navigationService = navigationService;
         _settingsService = settingsService;
@@ -193,42 +232,124 @@ public partial class MainViewModel : ObservableObject
         _installService = installService;
         _gameLauncher = gameLauncher;
         _authService = authService;
+        _appearanceService = appearanceService;
+        _appearanceService.LanguageChanged += (_, _) =>
+        {
+            RefreshPromoTexts();
+            RefreshSession();
+            if (!IsPlayBusy && !IsGameRunning && !PlayHasError)
+                UpdatePlayBar();
+        };
         Notifications = new NotificationViewModel(notificationService);
 
         _version = updateService.CurrentVersion;
         _currentPageViewModel = _homeViewModel;
 
         _navigationService.Navigated += OnNavigated;
-        _settingsService.SettingsChanged += (_, _) => _ = RefreshAppearanceAsync();
+        _settingsService.SettingsChanged += (_, _) =>
+            Application.Current.Dispatcher.InvokeAsync(() => _ = RefreshAppearanceAsync());
+        _authService.SessionChanged += (_, _) => RefreshSession();
+        _gameLauncher.GameCrashed += OnGameCrashed;
+        _seriesViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SeriesViewModel.SelectedSeries)
+                || e.PropertyName == nameof(SeriesViewModel.SelectedCard))
+                SyncPlaySelection();
+        };
+        _seriesViewModel.GameLaunched += NotifyLaunched;
 
         BuildPromos();
-        UpdateAvatar();
+        RefreshSession();
         _ = InitializeAsync();
     }
 
-    partial void OnSelectedPlaySeriesChanged(SeriesInfo? value) => UpdatePlayBar();
-    partial void OnUserNameChanged(string value) => UpdateAvatar();
+    private void OnGameCrashed(object? sender, GameCrashedArgs e)
+    {
+        // Viene del hilo del proceso: volver a la UI
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            _notificationService.NotifyError(
+                Loc.T("S.Crash.Title"),
+                Loc.Tf("S.Crash.Msg", e.ExitCode),
+                TimeSpan.FromSeconds(15));
+        });
+    }
+
+    /// <summary>La tarjeta clicada pasa a ser la serie activa de la barra.</summary>
+    private void SyncPlaySelection()
+    {
+        var id = _seriesViewModel.SelectedSeries?.Id;
+        if (string.IsNullOrWhiteSpace(id)) return;
+        var match = AvailableSeries.FirstOrDefault(s =>
+            string.Equals(s.Id, id, StringComparison.OrdinalIgnoreCase));
+        if (match != null && !ReferenceEquals(match, SelectedPlaySeries))
+            SelectedPlaySeries = match;
+    }
+
+    /// <summary>Juego lanzado desde una tarjeta: la barra pasa a JUGANDO.</summary>
+    private void NotifyLaunched(string seriesId)
+    {
+        var match = AvailableSeries.FirstOrDefault(s =>
+            string.Equals(s.Id, seriesId, StringComparison.OrdinalIgnoreCase));
+        if (match != null)
+        {
+            SelectedPlaySeries = match;
+            EnterPlayingState(match);
+        }
+        else
+        {
+            _ = RefreshPlaySeriesAsync();
+        }
+    }
+
+    private void RefreshSession()
+    {
+        var session = _authService.CurrentSession;
+        if (session != null)
+        {
+            UserName = session.Name;
+            IsLoggedIn = true;
+            AvatarUrl = session.Kind == AccountKind.Microsoft && !string.IsNullOrWhiteSpace(session.Uuid)
+                ? $"https://minotar.net/helm/{Uri.EscapeDataString(session.Uuid)}/100.png"
+                : $"https://minotar.net/helm/{Uri.EscapeDataString(session.Name)}/100.png";
+        }
+        else
+        {
+            IsLoggedIn = false;
+            UserName = Loc.T("S.Home.Launcher");
+            AvatarUrl = string.Empty;
+        }
+    }
+
+    partial void OnSelectedPlaySeriesChanged(SeriesInfo? value)
+    {
+        PlayHasError = false;
+        PlayStatusIsError = false;
+        UpdatePlayBar();
+    }
     partial void OnWindowActiveChanged(bool value) => OnPropertyChanged(nameof(ParticlesActive));
     partial void OnEnableParticlesChanged(bool value) => OnPropertyChanged(nameof(ParticlesActive));
     partial void OnEnableAnimationsChanged(bool value) => OnPropertyChanged(nameof(ParticlesActive));
     partial void OnBackgroundModeChanged(string value) => OnPropertyChanged(nameof(ParticlesActive));
 
-    private void UpdateAvatar()
-    {
-        var name = (UserName ?? string.Empty).Trim();
-        AvatarUrl = name.Length > 0
-            ? $"https://minotar.net/helm/{Uri.EscapeDataString(name)}/100.png"
-            : string.Empty;
-    }
-
     private void BuildPromos()
     {
         PromoItems = new ObservableCollection<PromoItem>
         {
-            new() { Title = "Próximo evento", Description = "Noche de estreno · ver Series", IconKey = "IconCalendar", Target = "Series" },
-            new() { Title = "Novedades", Description = "Lo último en Inicio", IconKey = "IconDiscord", Target = "Home" },
-            new() { Title = "Personalizá", Description = "Fondo y partículas", IconKey = "IconSparkles", Target = "Settings" },
+            new() { TitleKey = "S.Promo.Event", DescriptionKey = "S.Promo.EventSub", IconKey = "IconCalendar", Target = "Series" },
+            new() { TitleKey = "S.Promo.Updates", DescriptionKey = "S.Promo.UpdatesSub", IconKey = "IconUpdate", Target = "Updates" },
         };
+        RefreshPromoTexts();
+    }
+
+    /// <summary>Re-traduce las promos al cambiar el idioma.</summary>
+    public void RefreshPromoTexts()
+    {
+        foreach (var promo in PromoItems)
+        {
+            promo.Title = Loc.T(promo.TitleKey);
+            promo.Description = Loc.T(promo.DescriptionKey);
+        }
     }
 
     private void OnNavigated(object? sender, NavigationEventArgs e)
@@ -313,13 +434,13 @@ public partial class MainViewModel : ObservableObject
             var s = await _settingsService.GetSettingsAsync();
             BackgroundMode = string.IsNullOrWhiteSpace(s.BackgroundMode) ? "Auto" : s.BackgroundMode;
             SelectedBackground = Math.Max(0, s.SelectedBackground);
+            BackgroundInterval = Math.Clamp(s.BackgroundIntervalSeconds, 2, 20);
+            BackgroundDim = Math.Clamp(s.BackgroundDim, 0, 80);
+            BackgroundBlur = Math.Clamp(s.BackgroundBlur, 0, 20);
+            CustomBackgrounds = new System.Collections.Generic.List<string>(s.CustomBackgrounds ?? new());
             EnableParticles = s.EnableParticles;
             EnableAnimations = s.EnableAnimations;
-            if (_authService.IsAuthenticated && _authService.CurrentUser != null)
-            {
-                UserName = _authService.CurrentUser.Name;
-                IsLoggedIn = true;
-            }
+            RefreshSession();
         }
         catch (Exception ex)
         {
@@ -341,35 +462,61 @@ public partial class MainViewModel : ObservableObject
 
             if (SelectedPlaySeries == null)
             {
-                PlayButtonText = "SIN SERIES";
-                PlayStatusDetail = "No hay series en el catálogo";
+                PlayButtonText = Loc.T("S.NoSeries");
+                PlayStatusDetail = Loc.T("S.Play.NoCatalog");
             }
             else
             {
                 UpdatePlayBar();
             }
+
+            NotifyPendingUpdates(list);
         }
         catch (Exception ex)
         {
             _logService.Warning($"No se pudo cargar la serie para JUGAR: {ex.Message}");
-            PlayButtonText = "JUGAR";
-            PlayStatusDetail = "Conectate para ver las series";
+            PlayButtonText = Loc.T("S.Play");
+            PlayStatusDetail = Loc.T("S.Play.Connect");
+        }
+    }
+
+    private bool _modsNoticeShown;
+
+    /// <summary>Aviso discreto (una vez por sesión) si hay updates de mods.</summary>
+    private void NotifyPendingUpdates(System.Collections.Generic.List<SeriesInfo> list)
+    {
+        if (_modsNoticeShown) return;
+        try
+        {
+            var pending = list.FirstOrDefault(s => s.Status == SeriesStatus.UpdateAvailable);
+            if (pending == null) return;
+            _modsNoticeShown = true;
+            _notificationService.NotifyInfo(
+                pending.Name,
+                Loc.Tf("S.Update.AvailableFor", pending.Name, pending.Version),
+                TimeSpan.FromSeconds(8));
+        }
+        catch
+        {
+            // Aviso opcional: nunca rompe la carga
         }
     }
 
     private void UpdatePlayBar()
     {
+        if (IsGameRunning) return; // estado JUGANDO: no pisar hasta que termine
+
         var s = SelectedPlaySeries;
         if (s == null) return;
 
         PlayButtonText = s.Status switch
         {
-            SeriesStatus.Installed => "JUGAR",
-            SeriesStatus.NotInstalled => "INSTALAR",
-            SeriesStatus.UpdateAvailable => "ACTUALIZAR",
-            SeriesStatus.MissingFiles => "REPARAR",
-            SeriesStatus.ComingSoon => "PRÓXIMAMENTE",
-            _ => "JUGAR"
+            SeriesStatus.Installed => Loc.T("S.Play"),
+            SeriesStatus.NotInstalled => Loc.T("S.Install"),
+            SeriesStatus.UpdateAvailable => Loc.T("S.Update"),
+            SeriesStatus.MissingFiles => Loc.T("S.Repair"),
+            SeriesStatus.ComingSoon => Loc.T("S.ComingSoon"),
+            _ => Loc.T("S.Play")
         };
 
         PlayStatusDetail = BuildStatusDetail(s);
@@ -380,27 +527,22 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Estado real bajo el botón (versión, loader, mods, tamaño y fecha del directorio instalado).
-    /// Sin datos, muestra solo lo conocido — nunca inventa números.
+    /// Estado corto bajo el botón en una sola línea: estado + mods + fecha.
+    /// La versión y el loader van solo en el selector, sin repetirse.
     /// </summary>
     private static string BuildStatusDetail(SeriesInfo s)
     {
         var head = s.Status switch
         {
-            SeriesStatus.Installed => "Instalada",
-            SeriesStatus.NotInstalled => "Disponible",
-            SeriesStatus.UpdateAvailable => "Actualización lista",
-            SeriesStatus.MissingFiles => "Faltan archivos",
-            SeriesStatus.ComingSoon => "Próximamente",
+            SeriesStatus.Installed => Loc.T("S.Play.Head.Installed"),
+            SeriesStatus.NotInstalled => Loc.T("S.Play.Head.Available"),
+            SeriesStatus.UpdateAvailable => Loc.T("S.Play.Head.UpdateReady"),
+            SeriesStatus.MissingFiles => Loc.T("S.Play.Head.Missing"),
+            SeriesStatus.ComingSoon => Loc.T("Status.ComingSoon"),
             _ => s.StatusText
         };
 
-        var parts = new System.Collections.Generic.List<string> { head, $"v{s.Version}" };
-
-        if (!string.IsNullOrWhiteSpace(s.Definition.MinecraftVersion))
-            parts.Add(s.Definition.MinecraftVersion);
-        if (!string.IsNullOrWhiteSpace(s.Definition.Loader))
-            parts.Add(s.Definition.Loader);
+        var parts = new System.Collections.Generic.List<string> { head };
 
         if (s.IsInstalled && !string.IsNullOrWhiteSpace(s.InstallPath) && Directory.Exists(s.InstallPath))
         {
@@ -410,12 +552,12 @@ public partial class MainViewModel : ObservableObject
                 if (Directory.Exists(modsDir))
                 {
                     var jars = Directory.GetFiles(modsDir, "*.jar", SearchOption.TopDirectoryOnly).Length;
-                    if (jars > 0) parts.Add($"{jars} mods");
+                    if (jars > 0) parts.Add(Loc.Tf("S.Play.Mods", jars));
                 }
 
                 var updated = Directory.GetLastWriteTime(s.InstallPath);
                 if (updated > new DateTime(2009, 1, 1))
-                    parts.Add($"Act. {updated:dd/MM/yyyy}");
+                    parts.Add(Loc.Tf("S.Play.Updated", updated));
             }
             catch
             {
@@ -430,12 +572,23 @@ public partial class MainViewModel : ObservableObject
     private async Task PlayPrimaryAsync()
     {
         var series = SelectedPlaySeries;
-        if (series == null || IsPlayBusy) return;
-        if (series.Status == SeriesStatus.ComingSoon) return;
+        if (series == null || IsPlayBusy || IsGameRunning) return;
+        if (series.Status == SeriesStatus.ComingSoon && !PlayHasError) return;
 
+        PlayHasError = false;
+        PlayStatusIsError = false;
         IsPlayBusy = true;
         PlayProgress = 0;
-        PlayProgressText = "Preparando…";
+
+        var workingText = series.Status switch
+        {
+            SeriesStatus.Installed => Loc.T("S.Starting"),
+            SeriesStatus.UpdateAvailable => Loc.T("S.Updating"),
+            SeriesStatus.MissingFiles => Loc.T("S.Repairing"),
+            _ => Loc.T("S.Installing")
+        };
+        PlayButtonText = workingText;
+        PlayProgressText = Loc.T("S.Play.Preparing");
 
         try
         {
@@ -444,18 +597,39 @@ public partial class MainViewModel : ObservableObject
                 var launchProgress = new Progress<double>(p =>
                 {
                     PlayProgress = p;
-                    PlayProgressText = $"Preparando… {p:F0}%";
+                    PlayProgressText = Loc.Tf("S.Play.StartingPct", p);
                 });
                 var launched = await _gameLauncher.LaunchAsync(series.Id, launchProgress);
-                if (!launched.Success && !string.IsNullOrEmpty(launched.Message))
-                    _notificationService.NotifyError("No se pudo iniciar", launched.Message);
+                if (!launched.Success)
+                {
+                    SetPlayError(string.IsNullOrWhiteSpace(launched.Message)
+                        ? Loc.T("S.Play.CouldNotStart")
+                        : launched.Message);
+                    return;
+                }
+
+                EnterPlayingState(series);
+
+                var closeOnLaunch = false;
+                try
+                {
+                    closeOnLaunch = (await _settingsService.GetSettingsAsync()).CloseOnLaunch;
+                }
+                catch
+                {
+                    // Sin configuración: no cerrar
+                }
+                if (closeOnLaunch)
+                {
+                    Application.Current.Shutdown();
+                }
                 return;
             }
 
             var progress = new Progress<SeriesProgress>(p =>
             {
                 PlayProgress = p.Percent;
-                PlayProgressText = $"Paso {p.StepIndex}/{p.StepCount} · {p.StepName}";
+                PlayProgressText = Loc.Tf("S.Play.Step", p.StepIndex, p.StepCount, p.StepName, p.Percent);
             });
 
             SeriesOperationResult result = series.Status switch
@@ -466,22 +640,69 @@ public partial class MainViewModel : ObservableObject
             };
 
             if (result.Success)
-                _notificationService.NotifySuccess($"{series.Name} lista", result.Message);
+                _notificationService.NotifySuccess(Loc.Tf("S.Play.ReadyList", series.Name), result.Message);
             else
-                _notificationService.NotifyError("Operación fallida", result.Message);
+                SetPlayError(result.Message);
         }
         catch (Exception ex)
         {
             _logService.Error("Primary play action failed", ex);
-            _notificationService.NotifyError("Error", ex.Message);
+            SetPlayError(ex.Message);
         }
         finally
         {
             IsPlayBusy = false;
-            PlayProgressText = string.Empty;
+            if (!PlayHasError && !IsGameRunning)
+            {
+                PlayProgressText = string.Empty;
+                UpdatePlayBar();
+            }
         }
 
-        await RefreshPlaySeriesAsync();
+        if (!PlayHasError && !IsGameRunning)
+            await RefreshPlaySeriesAsync();
+    }
+
+    /// <summary>Estado de error: botón en rojo (REINTENTAR) + detalle del fallo.</summary>
+    private void SetPlayError(string message)
+    {
+        PlayHasError = true;
+        PlayStatusIsError = true;
+        PlayButtonText = Loc.T("S.Retry");
+        PlayStatusDetail = message;
+        OnPropertyChanged(nameof(CanPlayPrimary));
+        _notificationService.NotifyError(Loc.T("S.Common.Error"), message);
+    }
+
+    private DispatcherTimer? _gameWatchTimer;
+
+    /// <summary>Estado JUGANDO: botón verde deshabilitado hasta que cierra el juego.</summary>
+    private void EnterPlayingState(SeriesInfo series)
+    {
+        IsGameRunning = true;
+        PlayButtonText = Loc.T("S.Playing");
+        PlayProgressText = string.Empty;
+        PlayProgress = 0;
+        PlayStatusDetail = Loc.Tf("S.Play.Running", series.Name);
+        OnPropertyChanged(nameof(CanPlayPrimary));
+
+        _gameWatchTimer?.Stop();
+        _gameWatchTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+        _gameWatchTimer.Tick += async (_, _) =>
+        {
+            try
+            {
+                if (_gameLauncher.IsGameRunning) return;
+            }
+            catch
+            {
+                return;
+            }
+            _gameWatchTimer?.Stop();
+            IsGameRunning = false;
+            await RefreshPlaySeriesAsync();
+        };
+        _gameWatchTimer.Start();
     }
 
     [RelayCommand]
@@ -491,6 +712,10 @@ public partial class MainViewModel : ObservableObject
         {
             case "Series": _navigationService.NavigateTo(NavigationPage.Series); break;
             case "Settings": _navigationService.NavigateTo(NavigationPage.Settings); break;
+            case "Updates":
+                _ = CheckUpdatesAsync();
+                _navigationService.NavigateTo(NavigationPage.Settings);
+                break;
             default: _navigationService.NavigateTo(NavigationPage.Home); break;
         }
     }
@@ -664,10 +889,10 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Logout()
+    private async Task LogoutAsync()
     {
-        IsLoggedIn = false;
-        UserName = "Jugador";
+        await _authService.LogoutAsync();
+        RefreshSession();
         _logService.Info("User logged out");
     }
 }

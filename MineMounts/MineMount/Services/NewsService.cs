@@ -193,32 +193,32 @@ public class NewsService : INewsService
         {
             new()
             {
-                Title = "NSE6 ya está disponible",
-                Description = "Conocé las novedades de la nueva serie.",
+                Title = Loc.T("S.News.Nse.Title"),
+                Description = Loc.T("S.News.Nse.Desc"),
                 Date = DateTime.Now.AddDays(-1),
                 ImageUrl = string.Empty,
                 Category = "Serie"
             },
             new()
             {
-                Title = "Bienvenido a MineMount",
-                Description = "El launcher moderno para tus series. Explora, instalá y personaliza tu experiencia.",
+                Title = Loc.T("S.News.Welcome.Title"),
+                Description = Loc.T("S.News.Welcome.Desc"),
                 Date = DateTime.Now.AddDays(-3),
                 ImageUrl = string.Empty,
                 Category = "Anuncio"
             },
             new()
             {
-                Title = "Sistema de series renovado",
-                Description = "Ahora podés instalar, actualizar y reparar series completas con muchos mods y recursos.",
+                Title = Loc.T("S.News.System.Title"),
+                Description = Loc.T("S.News.System.Desc"),
                 Date = DateTime.Now.AddDays(-5),
                 ImageUrl = string.Empty,
                 Category = "Actualización"
             },
             new()
             {
-                Title = "Próximamente nuevas series",
-                Description = "Estamos preparando más series para que puedas disfrutar desde un solo lugar.",
+                Title = Loc.T("S.News.Soon.Title"),
+                Description = Loc.T("S.News.Soon.Desc"),
                 Date = DateTime.Now.AddDays(-7),
                 ImageUrl = string.Empty,
                 Category = "Comunidad"

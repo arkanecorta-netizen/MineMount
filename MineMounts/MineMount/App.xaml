@@ -7,6 +7,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Styles/Colors.xaml" />
+                <ResourceDictionary Source="Strings/Strings.es.xaml" />
                 <ResourceDictionary Source="Styles/CommonStyles.xaml" />
                 <ResourceDictionary Source="Styles/Controls.xaml" />
                 <ResourceDictionary Source="Styles/WindowChrome.xaml" />
@@ -23,6 +24,9 @@
             <converters:CategoryToBrushConverter x:Key="CategoryToBrushConverter" />
             <converters:CategoryToBackgroundConverter x:Key="CategoryToBackgroundConverter" />
             <converters:PromoIconConverter x:Key="PromoIconConverter" />
+            <converters:IntToVisibilityConverter x:Key="IntToVisibilityConverter" />
+            <converters:LocFormatConverter x:Key="LocFormatConverter" />
+            <converters:MbToGbConverter x:Key="MbToGbPlainConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

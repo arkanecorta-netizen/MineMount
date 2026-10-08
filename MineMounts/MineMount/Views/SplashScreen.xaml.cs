@@ -39,7 +39,29 @@ public partial class SplashScreen : Window
         _tempCleanupService = tempCleanupService;
 
         InitializeComponent();
+
+        try
+        {
+            var animations = _settingsService.GetSettingsAsync()
+                .GetAwaiter().GetResult().EnableAnimations;
+            if (!animations)
+            {
+                // Sin animaciones: estado final directo, sin transiciones
+                Triggers.Clear();
+                LayerBack.Opacity = 0.35;
+                LayerMid.Opacity = 0.6;
+                LayerFront.Opacity = 1;
+                BrandGlow.Opacity = 0.25;
+            }
+        }
+        catch
+        {
+            // Configuración ilegible: animación normal
+        }
+
         VersionLabel.Text = updateService.CurrentVersion;
+        StatusLabel.Text = Services.Loc.T("S.Splash.Loading");
+        PercentLabel.Text = "0 %";
     }
 
     public async Task RunAsync()
@@ -48,12 +70,12 @@ public partial class SplashScreen : Window
         // instantáneos animan suavemente; la descarga usa progreso real.
         var steps = new (string Label, double Weight, Func<IProgress<double>, Task> Work)[]
         {
-            ("Cargando configuración...", 5, LoadConfigurationAsync),
-            ("Comprobando actualizaciones...", 25, CheckUpdatesAsync),
-            ("Comprobando instalación de series...", 10, CheckSeriesAsync),
-            ("Inicializando servicios...", 10, InitializeServicesAsync),
-            ("Cargando recursos...", 10, LoadResourcesAsync),
-            ("Finalizando...", 40, FinalizeAsync)
+            (Services.Loc.T("S.Splash.S1"), 5, LoadConfigurationAsync),
+            (Services.Loc.T("S.Splash.S2"), 25, CheckUpdatesAsync),
+            (Services.Loc.T("S.Splash.S3"), 10, CheckSeriesAsync),
+            (Services.Loc.T("S.Splash.S4"), 10, InitializeServicesAsync),
+            (Services.Loc.T("S.Splash.S5"), 10, LoadResourcesAsync),
+            (Services.Loc.T("S.Splash.S6"), 40, FinalizeAsync)
         };
 
         var totalWeight = 0.0;
@@ -108,7 +130,7 @@ public partial class SplashScreen : Window
         }
 
         UpdateProgress(100);
-        SetStatus("Listo");
+        SetStatus(Services.Loc.T("S.Splash.Ready"));
         _logService.Info($"Splash completado en {_stopwatch.ElapsedMilliseconds} ms");
 
         await Task.Delay(300);
@@ -156,10 +178,10 @@ public partial class SplashScreen : Window
             return;
         }
 
-        SetStatus($"Descargando v{_updateService.LatestVersion}...");
+        SetStatus(Services.Loc.Tf("S.Splash.Downloading", $"v{_updateService.LatestVersion}"));
         var downloadProgress = new Progress<double>(p =>
         {
-            SetStatus($"Descargando v{_updateService.LatestVersion}... {p:F0}%");
+            SetStatus(Services.Loc.Tf("S.Splash.Downloading", $"v{_updateService.LatestVersion} {p:F0}%"));
             progress.Report(p);
         });
 
@@ -173,7 +195,7 @@ public partial class SplashScreen : Window
             return;
         }
 
-        SetStatus("Instalando actualización...");
+        SetStatus(Services.Loc.T("S.Splash.Installing"));
         progress.Report(95);
 
         if (!_updateService.ApplyAndRestart())

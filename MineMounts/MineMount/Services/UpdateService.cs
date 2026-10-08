@@ -246,21 +246,25 @@ public class UpdateService : IUpdateService
                 int read;
                 received = 0;
 
-                while ((read = await input.ReadAsync(buffer, cts.Token)) > 0)
+                using (await DownloadLimiter.AcquireAsync(cts.Token))
                 {
-                    await output.WriteAsync(buffer.AsMemory(0, read), cts.Token);
-                    received += read;
-
-                    if (total > 0)
+                    while ((read = await input.ReadAsync(buffer, cts.Token)) > 0)
                     {
-                        var percent = received * 100.0 / total;
-                        progress?.Report(percent);
+                        await DownloadLimiter.ThrottleAsync(read, cts.Token);
+                        await output.WriteAsync(buffer.AsMemory(0, read), cts.Token);
+                        received += read;
 
-                        var decile = (int)(percent / 10);
-                        if (decile != lastLoggedDecile)
+                        if (total > 0)
                         {
-                            lastLoggedDecile = decile;
-                            _log.Info($"Descargando actualización: {decile * 10}% ({received / 1024 / 1024} MB)");
+                            var percent = received * 100.0 / total;
+                            progress?.Report(percent);
+
+                            var decile = (int)(percent / 10);
+                            if (decile != lastLoggedDecile)
+                            {
+                                lastLoggedDecile = decile;
+                                _log.Info($"Descargando actualización: {decile * 10}% ({received / 1024 / 1024} MB)");
+                            }
                         }
                     }
                 }

@@ -15,6 +15,12 @@ public interface ISettingsService
 
 public class SettingsService : ISettingsService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals
+    };
+
     private readonly string _settingsPath;
     private Models.LauncherSettings _settings = new();
 
@@ -35,13 +41,15 @@ public class SettingsService : ISettingsService
             try
             {
                 var json = await File.ReadAllTextAsync(_settingsPath);
-                _settings = JsonSerializer.Deserialize<Models.LauncherSettings>(json) ?? new();
+                _settings = JsonSerializer.Deserialize<Models.LauncherSettings>(json, JsonOptions) ?? new();
             }
             catch
             {
                 _settings = new Models.LauncherSettings();
             }
         }
+
+        ApplyDownloadLimits();
     }
 
     public Task<Models.LauncherSettings> GetSettingsAsync()
@@ -52,8 +60,23 @@ public class SettingsService : ISettingsService
     public async Task SaveSettingsAsync(Models.LauncherSettings settings)
     {
         _settings = settings;
-        var json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(_settings, JsonOptions);
         await File.WriteAllTextAsync(_settingsPath, json);
+        ApplyDownloadLimits();
         SettingsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ApplyDownloadLimits()
+    {
+        try
+        {
+            DownloadLimiter.Configure(
+                _settings.MaxConcurrentDownloads,
+                (long)_settings.DownloadSpeedLimitKBps * 1024);
+        }
+        catch
+        {
+            // Límites inválidos: se ignoran sin romper el guardado
+        }
     }
 }

@@ -14,6 +14,7 @@ public interface ISeriesInstallService
     Task<SeriesOperationResult> InstallAsync(string id, IProgress<SeriesProgress>? progress = null, CancellationToken cancellationToken = default);
     Task<SeriesOperationResult> UpdateAsync(string id, IProgress<SeriesProgress>? progress = null, CancellationToken cancellationToken = default);
     Task<SeriesOperationResult> RepairAsync(string id, IProgress<SeriesProgress>? progress = null, CancellationToken cancellationToken = default);
+    Task<bool> UninstallAsync(string id);
 }
 
 public class SeriesInstallService : ISeriesInstallService
@@ -76,6 +77,42 @@ public class SeriesInstallService : ISeriesInstallService
 
     public Task<SeriesOperationResult> RepairAsync(string id, IProgress<SeriesProgress>? progress = null, CancellationToken cancellationToken = default)
         => RunAsync(id, "Reparación", progress, cancellationToken);
+
+    /// <summary>
+    /// Desinstala una serie: borra su carpeta (con guardia anti path
+    /// traversal). El catálogo no se toca.
+    /// </summary>
+    public async Task<bool> UninstallAsync(string id)
+    {
+        try
+        {
+            if (!SeriesValidation.IsValidSeriesId(id)) return false;
+
+            var dir = await _storageService.GetSeriesDirAsync(id);
+            var root = await _storageService.GetInstallRootAsync();
+            var fullDir = Path.GetFullPath(dir);
+            var fullRoot = Path.GetFullPath(root) + Path.DirectorySeparatorChar;
+
+            if (!fullDir.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                _logService.Warning($"Desinstalación bloqueada fuera de la raíz: {id}");
+                return false;
+            }
+
+            if (Directory.Exists(fullDir))
+            {
+                Directory.Delete(fullDir, recursive: true);
+                _logService.Info($"Serie {id} desinstalada ({fullDir})");
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logService.Error($"No se pudo desinstalar {id}", ex);
+            return false;
+        }
+    }
 
     // ---------------------------------------------------------------
     //  Pipeline: resolver → descargar → validar/extraer → verificar

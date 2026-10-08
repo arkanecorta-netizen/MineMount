@@ -13,7 +13,7 @@
         </LinearGradientBrush>
 
         <Style x:Key="SeriesInfoPill" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}" />
+            <Setter Property="Background" Value="{DynamicResource BackgroundTertiaryBrush}" />
             <Setter Property="CornerRadius" Value="9999" />
             <Setter Property="Padding" Value="12,5" />
             <Setter Property="Margin" Value="0,0,8,0" />
@@ -58,14 +58,14 @@
             <Border Height="170"
                     CornerRadius="12"
                     ClipToBounds="True"
-                    BorderBrush="{StaticResource BorderPrimaryBrush}"
+                    BorderBrush="{DynamicResource BorderPrimaryBrush}"
                     BorderThickness="1"
-                    Background="{StaticResource SeriesBannerFallbackBrush}">
+                    Background="{DynamicResource SeriesBannerFallbackBrush}">
                 <Grid>
                     <Ellipse Width="380" Height="380"
                              HorizontalAlignment="Right" VerticalAlignment="Bottom"
                              Margin="200,60,-130,-190"
-                             Fill="{StaticResource GlowGradientBrush}"
+                             Fill="{DynamicResource GlowGradientBrush}"
                              Opacity="0.5" />
                     <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
@@ -78,7 +78,7 @@
                                    Margin="0,10,0,0"
                                    FontSize="12"
                                    FontWeight="SemiBold"
-                                   Foreground="{StaticResource AccentLightBrush}" />
+                                   Foreground="{DynamicResource AccentLightBrush}" />
                     </StackPanel>
                     <Image Source="{Binding Banner}"
                            Stretch="UniformToFill">
@@ -107,9 +107,9 @@
                         Width="72" Height="72"
                         CornerRadius="14"
                         ClipToBounds="True"
-                        BorderBrush="{StaticResource BorderPrimaryBrush}"
+                        BorderBrush="{DynamicResource BorderPrimaryBrush}"
                         BorderThickness="1"
-                        Background="{StaticResource SeriesBannerFallbackBrush}"
+                        Background="{DynamicResource SeriesBannerFallbackBrush}"
                         VerticalAlignment="Top">
                     <Grid>
                         <ContentControl Content="{StaticResource IconLogo}"
@@ -169,11 +169,11 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Versión"
                                    FontSize="11"
-                                   Foreground="{StaticResource ForegroundSecondaryBrush}" />
+                                   Foreground="{DynamicResource ForegroundSecondaryBrush}" />
                         <TextBlock Text="{Binding Version}"
                                    FontSize="11"
                                    FontWeight="SemiBold"
-                                   Foreground="{StaticResource AccentLightBrush}"
+                                   Foreground="{DynamicResource AccentLightBrush}"
                                    Margin="6,0,0,0" />
                     </StackPanel>
                 </Border>
@@ -182,18 +182,18 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Instalada"
                                    FontSize="11"
-                                   Foreground="{StaticResource ForegroundSecondaryBrush}" />
+                                   Foreground="{DynamicResource ForegroundSecondaryBrush}" />
                         <TextBlock Text="{Binding InstalledVersion}"
                                    FontSize="11"
                                    FontWeight="SemiBold"
-                                   Foreground="{StaticResource ForegroundPrimaryBrush}"
+                                   Foreground="{DynamicResource ForegroundPrimaryBrush}"
                                    Margin="6,0,0,0">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding InstalledVersion}" Value="">
                                             <Setter Property="Text" Value="—" />
-                                            <Setter Property="Foreground" Value="{StaticResource ForegroundMutedBrush}" />
+                                            <Setter Property="Foreground" Value="{DynamicResource ForegroundMutedBrush}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -207,11 +207,11 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Ubicación"
                                    FontSize="11"
-                                   Foreground="{StaticResource ForegroundSecondaryBrush}" />
+                                   Foreground="{DynamicResource ForegroundSecondaryBrush}" />
                         <TextBlock Text="{Binding InstallPath}"
                                    FontSize="11"
                                    FontWeight="SemiBold"
-                                   Foreground="{StaticResource ForegroundPrimaryBrush}"
+                                   Foreground="{DynamicResource ForegroundPrimaryBrush}"
                                    Margin="6,0,0,0"
                                    MaxWidth="260"
                                    TextTrimming="CharacterEllipsis">
@@ -220,7 +220,7 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding InstallPath}" Value="">
                                             <Setter Property="Text" Value="—" />
-                                            <Setter Property="Foreground" Value="{StaticResource ForegroundMutedBrush}" />
+                                            <Setter Property="Foreground" Value="{DynamicResource ForegroundMutedBrush}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -231,7 +231,7 @@
             </StackPanel>
 
             <!-- Coming soon notice -->
-            <Border Background="{StaticResource BackgroundTertiaryBrush}"
+            <Border Background="{DynamicResource BackgroundTertiaryBrush}"
                     CornerRadius="8"
                     Padding="16,12"
                     Margin="0,16,0,0">
@@ -337,7 +337,7 @@
                     <TextBlock Text="Progreso"
                                Style="{StaticResource TextBlock.Secondary}" />
                     <TextBlock HorizontalAlignment="Right"
-                               Foreground="{StaticResource ForegroundSecondaryBrush}">
+                               Foreground="{DynamicResource ForegroundSecondaryBrush}">
                         <Run Text="{Binding ProgressPercent, StringFormat={}{0:F0}, Mode=OneWay}" />
                         <Run Text=" %" />
                     </TextBlock>
@@ -363,7 +363,7 @@
                        Margin="0,16,0,0"
                        FontSize="13"
                        FontWeight="SemiBold"
-                       Foreground="{StaticResource AccentLightBrush}"
+                       Foreground="{DynamicResource AccentLightBrush}"
                        Visibility="{Binding ResultMessage, Converter={StaticResource StringToVisibilityConverter}}" />
 
         </StackPanel>

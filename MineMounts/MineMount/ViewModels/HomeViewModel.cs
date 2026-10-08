@@ -19,6 +19,7 @@ public partial class HomeViewModel : ObservableObject
     private readonly ISeriesInstallService _installService;
     private readonly IGameLauncherService _gameLauncher;
     private readonly INotificationService _notificationService;
+    private readonly IAppearanceService _appearanceService;
 
     [ObservableProperty]
     private ObservableCollection<NewsItem> _newsItems = new();
@@ -44,12 +45,15 @@ public partial class HomeViewModel : ObservableObject
     [ObservableProperty]
     private bool _bannerIsNews;
 
-    // Hero tipográfico sobre el fondo: eyebrow con tracking + logo grande de la serie
+    // Hero tipográfico sobre el fondo: etiqueta + título + descripción + estado
     [ObservableProperty]
     private string _heroEyebrow = "MINEMOUNT · LAUNCHER";
 
     [ObservableProperty]
     private string _heroLogo = "pack://application:,,,/Assets/MineMount/logo.png";
+
+    [ObservableProperty]
+    private string _heroStatusLine = string.Empty;
 
     [ObservableProperty]
     private string _bannerActionText = string.Empty;
@@ -78,7 +82,8 @@ public partial class HomeViewModel : ObservableObject
         ISeriesService seriesService,
         ISeriesInstallService installService,
         IGameLauncherService gameLauncher,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IAppearanceService appearanceService)
     {
         _logService = logService;
         _newsService = newsService;
@@ -86,10 +91,24 @@ public partial class HomeViewModel : ObservableObject
         _installService = installService;
         _gameLauncher = gameLauncher;
         _notificationService = notificationService;
+        _appearanceService = appearanceService;
+        _appearanceService.LanguageChanged += (_, _) =>
+        {
+            UpdateHero();
+            OnPropertyChanged(nameof(SeriesVersionLine));
+            if (!BannerIsNews && FeaturedSeries == null)
+            {
+                BannerTitle = Loc.T("S.Home.Welcome");
+                BannerSubtitle = Loc.T("S.Home.Subtitle");
+                HeroEyebrow = Loc.T("S.Home.Launcher");
+            }
+        };
 
         _newsService.OnNewsUpdated += OnNewsUpdated;
         _ = LoadAsync();
     }
+
+    partial void OnFeaturedSeriesChanged(SeriesInfo? value) => UpdateHero();
 
     private void OnNewsUpdated(object? sender, System.Collections.Generic.List<NewsItem> news)
     {
@@ -159,11 +178,11 @@ public partial class HomeViewModel : ObservableObject
         else
         {
             BannerIsNews = false;
-            BannerTitle = "BIENVENIDO A MINEMOUNT";
-            BannerSubtitle = "Descubrí, instalá y gestioná tus series desde un solo lugar";
+            BannerTitle = Loc.T("S.Home.Welcome");
+            BannerSubtitle = Loc.T("S.Home.Subtitle");
             BannerImageUrl = DefaultBannerUri;
             BannerActionText = string.Empty;
-            HeroEyebrow = "MINEMOUNT · LAUNCHER";
+            HeroEyebrow = Loc.T("S.Home.Launcher");
             HeroLogo = "pack://application:,,,/Assets/MineMount/logo.png";
         }
     }
@@ -197,6 +216,7 @@ public partial class HomeViewModel : ObservableObject
         HeroLogo = string.IsNullOrWhiteSpace(FeaturedSeries.Logo)
             ? "pack://application:,,,/Assets/MineMount/logo.png"
             : FeaturedSeries.Logo;
+        HeroStatusLine = $"{FeaturedSeries.StatusText.ToUpperInvariant()} · {string.Join(" · ", parts)}";
         OnPropertyChanged(nameof(SeriesVersionLine));
     }
 
@@ -300,7 +320,6 @@ public partial class HomeViewModel : ObservableObject
         UpdateFeaturedAction();
         UpdateHero();
         ApplySeriesBanner();
-        UpdateHero();
     }
 
     [RelayCommand]

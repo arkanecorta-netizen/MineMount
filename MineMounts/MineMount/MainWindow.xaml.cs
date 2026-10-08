@@ -35,9 +35,12 @@ public partial class MainWindow : Window
 
         Loaded += (_, _) =>
         {
+            RestoreWindowBounds();
             ApplyAppearance();
+            ApplyResponsiveLayout();
             FadeInCurrentPage();
         };
+        Closing += (_, _) => SaveWindowBounds();
 
         UpdateWindowShape();
     }
@@ -71,7 +74,14 @@ public partial class MainWindow : Window
     private void ApplyAppearance()
     {
         if (_viewModel == null) return;
-        Backdrop.Configure(_viewModel.BackgroundMode, _viewModel.SelectedBackground, _viewModel.EnableAnimations);
+        Backdrop.Configure(
+            _viewModel.BackgroundMode,
+            _viewModel.SelectedBackground,
+            _viewModel.EnableAnimations,
+            _viewModel.BackgroundInterval,
+            _viewModel.BackgroundDim,
+            _viewModel.BackgroundBlur,
+            _viewModel.CustomBackgrounds);
         Backdrop.IsPaused = !_viewModel.WindowActive;
         ParticlesHost.SetActive(_viewModel.ParticlesActive);
     }
@@ -117,6 +127,10 @@ public partial class MainWindow : Window
         }
         else if (e.PropertyName == nameof(MainViewModel.BackgroundMode)
             || e.PropertyName == nameof(MainViewModel.SelectedBackground)
+            || e.PropertyName == nameof(MainViewModel.BackgroundInterval)
+            || e.PropertyName == nameof(MainViewModel.BackgroundDim)
+            || e.PropertyName == nameof(MainViewModel.BackgroundBlur)
+            || e.PropertyName == nameof(MainViewModel.CustomBackgrounds)
             || e.PropertyName == nameof(MainViewModel.EnableAnimations))
         {
             ApplyAppearance();
@@ -140,6 +154,100 @@ public partial class MainWindow : Window
     private void OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
         UpdateWindowShape();
+        ApplyResponsiveLayout();
+    }
+
+    /// <summary>
+    /// Layout fluido: al achicar, primero se ocultan las promos, luego se
+    /// compacta el selector; el botón JUGAR siempre queda visible.
+    /// </summary>
+    private void ApplyResponsiveLayout()
+    {
+        if (PromoScroller == null || VersionBox == null) return;
+
+        var w = ActualWidth;
+        if (_viewModel != null) _viewModel.PromosCompact = w < 1100;
+
+        if (w < 1020)
+        {
+            VersionBox.Width = 150;
+            VersionLabel.Visibility = Visibility.Collapsed;
+            VersionPanel.Margin = new Thickness(10, 0, 0, 26);
+        }
+        else
+        {
+            VersionBox.Width = 220;
+            VersionLabel.Visibility = Visibility.Visible;
+            VersionPanel.Margin = new Thickness(14, 0, 0, 26);
+        }
+    }
+
+    /// <summary>Restaura tamaño, posición y estado guardados (validados a pantalla).</summary>
+    private void RestoreWindowBounds()
+    {
+        try
+        {
+            var s = App.GetService<ISettingsService>().GetSettingsAsync().GetAwaiter().GetResult();
+
+            var vw = SystemParameters.VirtualScreenWidth;
+            var vh = SystemParameters.VirtualScreenHeight;
+            var vx = SystemParameters.VirtualScreenLeft;
+            var vy = SystemParameters.VirtualScreenTop;
+
+            if (s.WindowWidth >= MinWidth && s.WindowWidth <= vw) Width = s.WindowWidth;
+            if (s.WindowHeight >= MinHeight && s.WindowHeight <= vh) Height = s.WindowHeight;
+
+            var left = double.IsNaN(s.WindowLeft) ? Left : s.WindowLeft;
+            var top = double.IsNaN(s.WindowTop) ? Top : s.WindowTop;
+            if (left >= vx - 40 && left <= vx + vw - 100
+                && top >= vy - 20 && top <= vy + vh - 100)
+            {
+                Left = left;
+                Top = top;
+            }
+
+            if (s.WindowMaximized) WindowState = WindowState.Maximized;
+        }
+        catch
+        {
+            // Geometría inválida: se usan los valores por defecto del XAML.
+        }
+    }
+
+    /// <summary>Guarda tamaño, posición y estado al cerrar (sin bloquear la UI).</summary>
+    private void SaveWindowBounds()
+    {
+        try
+        {
+            // Lecturas sincrónicas en el hilo UI; el IO va a un hilo de fondo
+            // (Task.Run evita el deadlock del contexto de sincronización).
+            var maximized = WindowState == WindowState.Maximized;
+            var width = ActualWidth;
+            var height = ActualHeight;
+            var left = Left;
+            var top = Top;
+
+            System.Threading.Tasks.Task.Run(async () =>
+            {
+                var service = App.GetService<ISettingsService>();
+                var s = await service.GetSettingsAsync();
+
+                s.WindowMaximized = maximized;
+                if (!maximized)
+                {
+                    s.WindowWidth = width;
+                    s.WindowHeight = height;
+                    s.WindowLeft = left;
+                    s.WindowTop = top;
+                }
+
+                await service.SaveSettingsAsync(s);
+            }).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // No bloquear el cierre por no poder guardar la geometría.
+        }
     }
 
     private void UpdateWindowShape()
@@ -170,6 +278,7 @@ public partial class MainWindow : Window
     private void FadeInCurrentPage()
     {
         if (PageHost == null) return;
+        if (_viewModel != null && !_viewModel.EnableAnimations) return;
 
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
         var duration = TimeSpan.FromMilliseconds(250);

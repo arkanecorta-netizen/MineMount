@@ -292,18 +292,22 @@ public class SeriesResourceService : ISeriesResourceService
         CancellationToken cancellationToken,
         Action<long> onProgress)
     {
-        var buffer = new byte[81920];
-        long totalRead = 0;
-
-        int read;
-        while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
+        using (await DownloadLimiter.AcquireAsync(cancellationToken))
         {
-            await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-            totalRead += read;
+            var buffer = new byte[81920];
+            long totalRead = 0;
+
+            int read;
+            while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                await DownloadLimiter.ThrottleAsync(read, cancellationToken);
+                await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                totalRead += read;
+                onProgress(totalRead);
+            }
+
             onProgress(totalRead);
         }
-
-        onProgress(totalRead);
     }
 
     private sealed class GitHubRelease

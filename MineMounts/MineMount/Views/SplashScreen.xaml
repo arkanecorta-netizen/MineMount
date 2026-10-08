@@ -72,7 +72,7 @@
     </Window.Triggers>
 
     <Border CornerRadius="12"
-            BorderBrush="{StaticResource GlassBorderBrush}"
+            BorderBrush="{DynamicResource GlassBorderBrush}"
             BorderThickness="1"
             ClipToBounds="True">
         <Border.Background>
@@ -82,13 +82,13 @@
             <!-- Fondo desenfocado (una de las imágenes, offline) -->
             <Image Source="pack://application:,,,/Assets/Backgrounds/bg1.png"
                    Stretch="UniformToFill"
-                   RenderOptions.BitmapScalingMode="LowQuality">
+                   RenderOptions.BitmapScalingMode="HighQuality">
                 <Image.Effect>
-                    <BlurEffect Radius="28" />
+                    <BlurEffect Radius="14" />
                 </Image.Effect>
             </Image>
-            <Border Background="{StaticResource BackgroundScrimBrush}" />
-            <Border Background="{StaticResource BrandTintBrush}" />
+            <Border Background="{DynamicResource BackgroundScrimBrush}" />
+            <Border Background="{DynamicResource BrandTintBrush}" />
 
             <Grid Margin="36,32">
                 <Grid.RowDefinitions>
@@ -106,7 +106,7 @@
                       Margin="0,48,0,0">
                     <Ellipse x:Name="BrandGlow"
                              Width="200" Height="200"
-                             Fill="{StaticResource BrandGradientBrush}"
+                             Fill="{DynamicResource BrandGradientBrush}"
                              Opacity="0.25" />
                     <ContentControl x:Name="LayerBack"
                                     Content="{StaticResource IconLogo}"
@@ -159,7 +159,7 @@
                 <!-- Estado -->
                 <TextBlock Grid.Row="2"
                            x:Name="StatusLabel"
-                           Text="Cargando..."
+                           Text="{DynamicResource S.Splash.Loading}"
                            HorizontalAlignment="Center"
                            Style="{StaticResource TextBlock.Secondary}"
                            Margin="0,16,0,0" />
@@ -182,13 +182,13 @@
                                HorizontalAlignment="Left"
                                FontSize="11"
                                FontWeight="SemiBold"
-                               Foreground="{StaticResource CyanLightBrush}" />
+                               Foreground="{DynamicResource CyanLightBrush}" />
                     <TextBlock x:Name="VersionLabel"
                                Text="1.0.0"
                                HorizontalAlignment="Right"
                                VerticalAlignment="Center"
                                FontSize="11"
-                               Foreground="{StaticResource ForegroundMutedBrush}" />
+                               Foreground="{DynamicResource ForegroundMutedBrush}" />
                 </Grid>
             </Grid>
         </Grid>

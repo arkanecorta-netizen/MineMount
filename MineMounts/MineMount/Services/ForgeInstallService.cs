@@ -66,25 +66,29 @@ public class ForgeInstallService : IForgeInstallService
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(TimeSpan.FromMinutes(10));
 
-                using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-                resp.EnsureSuccessStatusCode();
-
-                var total = resp.Content.Headers.ContentLength ?? -1;
-                long received = 0;
-
-                await using var source = await resp.Content.ReadAsStreamAsync(cts.Token);
-                await using var target = File.Create(jar);
-
-                var buffer = new byte[81920];
-                int read;
-                while ((read = await source.ReadAsync(buffer, cts.Token)) > 0)
+                using (await DownloadLimiter.AcquireAsync(cts.Token))
                 {
-                    await target.WriteAsync(buffer.AsMemory(0, read), cts.Token);
-                    received += read;
+                    using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                    resp.EnsureSuccessStatusCode();
 
-                    if (total > 0)
+                    var total = resp.Content.Headers.ContentLength ?? -1;
+                    long received = 0;
+
+                    await using var source = await resp.Content.ReadAsStreamAsync(cts.Token);
+                    await using var target = File.Create(jar);
+
+                    var buffer = new byte[81920];
+                    int read;
+                    while ((read = await source.ReadAsync(buffer, cts.Token)) > 0)
                     {
-                        progress?.Report(10 + (received * 90.0 / total));
+                        await DownloadLimiter.ThrottleAsync(read, cts.Token);
+                        await target.WriteAsync(buffer.AsMemory(0, read), cts.Token);
+                        received += read;
+
+                        if (total > 0)
+                        {
+                            progress?.Report(10 + (received * 90.0 / total));
+                        }
                     }
                 }
 

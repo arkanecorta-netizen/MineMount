@@ -159,6 +159,64 @@ public class CategoryToBackgroundConverter : IValueConverter
 }
 
 /// <summary>
+/// Formatea valores con una plantilla localizada: el parámetro es la clave
+/// (ej: "S.Game.RamTotal") y los bindings aportan los argumentos.
+/// </summary>
+public class LocFormatConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        var key = parameter as string ?? string.Empty;
+        try
+        {
+            var format = Services.Loc.T(key);
+            return string.Format(culture, format, values);
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>MB → "X,Y GB" para etiquetas de RAM.</summary>
+public class MbToGbConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is int mb) return $"{mb / 1024.0:F1} GB";
+        if (value is long lmb) return $"{lmb / 1024.0:F1} GB";
+        return "? GB";
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>Muestra el elemento solo cuando el entero coincide con el parámetro.</summary>
+public class IntToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is int i && parameter != null && int.TryParse(parameter.ToString(), out var want))
+            return i == want ? Visibility.Visible : Visibility.Collapsed;
+        return Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
 /// Resuelve un icono por su clave de recurso (ej: "IconCalendar") para las promos.
 /// </summary>
 public class PromoIconConverter : IValueConverter

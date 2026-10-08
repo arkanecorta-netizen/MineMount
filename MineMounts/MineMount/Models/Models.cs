@@ -26,6 +26,42 @@ public class LauncherSettings
 
     // Detalles que le dan vida
     public bool EnableParticles { get; set; } = true;
+
+    // Comunidad (invitación de Discord configurable)
+    public string DiscordUrl { get; set; } = string.Empty;
+
+    // Geometría de la ventana (se restaura entre sesiones)
+    public double WindowWidth { get; set; } = 1280;
+    public double WindowHeight { get; set; } = 760;
+    public double WindowLeft { get; set; } = double.NaN;
+    public double WindowTop { get; set; } = double.NaN;
+    public bool WindowMaximized { get; set; } = false;
+
+    // Cuenta: "None" | "Microsoft" | "Offline"
+    public string AccountType { get; set; } = "None";
+    public string OfflineUuid { get; set; } = string.Empty;
+
+    // Fondo: intervalo, oscurecido extra y desenfoque
+    public int BackgroundIntervalSeconds { get; set; } = 8;
+    public int BackgroundDim { get; set; } = 25;
+    public int BackgroundBlur { get; set; } = 0;
+    public List<string> CustomBackgrounds { get; set; } = new();
+
+    // Sonido de click (0-100)
+    public int ClickVolume { get; set; } = 30;
+
+    // Descargas: 0 = sin límite; simultáneas 1-4
+    public int DownloadSpeedLimitKBps { get; set; } = 0;
+    public int MaxConcurrentDownloads { get; set; } = 2;
+
+    // Lanzamiento
+    public string JvmArgs { get; set; } = string.Empty;
+    public bool Fullscreen { get; set; } = false;
+    public string Resolution { get; set; } = "1280x720";
+    public bool CloseOnLaunch { get; set; } = false;
+
+    // Comunidad
+    public string DiscordClientId { get; set; } = string.Empty;
 }
 
 public class UserInfo
@@ -123,6 +159,9 @@ public class SeriesDefinition
     public string Loader { get; set; } = string.Empty;
     public string JVMArgs { get; set; } = string.Empty;
     public string GameArgs { get; set; } = string.Empty;
+
+    // Novedades de esta versión (visible antes de actualizar)
+    public string Changelog { get; set; } = string.Empty;
 }
 
 public class SeriesInstallation
@@ -174,11 +213,11 @@ public class SeriesInfo
 
     public string StatusText => Status switch
     {
-        SeriesStatus.ComingSoon => "Próximamente",
-        SeriesStatus.NotInstalled => "NO INSTALADO",
-        SeriesStatus.Installed => "INSTALADA",
-        SeriesStatus.UpdateAvailable => "ACTUALIZACIÓN DISPONIBLE",
-        SeriesStatus.MissingFiles => "FALTAN ARCHIVOS",
+        SeriesStatus.ComingSoon => Services.Loc.T("Status.ComingSoon"),
+        SeriesStatus.NotInstalled => Services.Loc.T("Status.NotInstalled"),
+        SeriesStatus.Installed => Services.Loc.T("Status.Installed"),
+        SeriesStatus.UpdateAvailable => Services.Loc.T("Status.UpdateAvailable"),
+        SeriesStatus.MissingFiles => Services.Loc.T("Status.MissingFiles"),
         _ => string.Empty
     };
 

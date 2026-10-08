@@ -9,12 +9,12 @@
 
     <UserControl.Resources>
         <Style x:Key="NotificationCard" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource BackgroundSecondaryBrush}" />
+            <Setter Property="Background" Value="{DynamicResource BackgroundSecondaryBrush}" />
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="14,12" />
             <Setter Property="Margin" Value="0,0,0,10" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderPrimaryBrush}" />
             <Setter Property="Effect">
                 <Setter.Value>
                     <DropShadowEffect BlurRadius="16" ShadowDepth="2" Color="#FF000000" Opacity="0.4" Direction="270" />
@@ -64,7 +64,7 @@
                             <TextBlock Text="{Binding Title}"
                                        FontWeight="SemiBold"
                                        FontSize="13"
-                                       Foreground="{StaticResource ForegroundPrimaryBrush}"
+                                       Foreground="{DynamicResource ForegroundPrimaryBrush}"
                                        TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding Message}"
                                        Style="{StaticResource TextBlock.Muted}"

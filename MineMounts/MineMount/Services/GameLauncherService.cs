@@ -26,7 +26,28 @@ public class SeriesLaunchConfig
     public string AssetIndex { get; set; } = string.Empty;
     public string Username { get; set; } = "Player";
     public string UUID { get; set; } = string.Empty;
+    public string AccessToken { get; set; } = "0";
+    public string UserType { get; set; } = "legacy";
+    public string JvmArgs { get; set; } = string.Empty;
+    public bool Fullscreen { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
     public bool MinimizeLauncher { get; set; }
+}
+
+public sealed class JavaInstall
+{
+    public string Path { get; set; } = string.Empty;
+    public int Major { get; set; }
+    public string Display { get; set; } = string.Empty;
+}
+
+public sealed class GameCrashedArgs : EventArgs
+{
+    public string SeriesId { get; set; } = string.Empty;
+    public string SeriesName { get; set; } = string.Empty;
+    public int ExitCode { get; set; }
+    public string LogPath { get; set; } = string.Empty;
 }
 
 public class LaunchResult
@@ -39,9 +60,12 @@ public class LaunchResult
 public interface IGameLauncherService
 {
     Task<string?> FindJavaAsync(int minMajorVersion = 0);
+    Task<List<JavaInstall>> ListJavaAsync();
+    int GetRequiredJava(string minecraftVersion);
     Task<bool> VerifyInstallationAsync(string seriesId);
     Task<LaunchResult> LaunchAsync(string seriesId, IProgress<double>? progress = null);
     bool IsGameRunning { get; }
+    event EventHandler<GameCrashedArgs>? GameCrashed;
 }
 
 // Lanzador de series. El ViewModel NO ejecuta Minecraft directamente:
@@ -56,10 +80,16 @@ public class GameLauncherService : IGameLauncherService
     private readonly INotificationService _notificationService;
     private readonly IMinecraftInstallService _minecraftInstall;
     private readonly IForgeInstallService _forgeInstall;
+    private readonly IAuthService _authService;
 
     private Process? _runningProcess;
+    private string _lastSeriesId = string.Empty;
+    private string _lastSeriesName = string.Empty;
+    private string _lastGameDir = string.Empty;
 
     public bool IsGameRunning => _runningProcess is { HasExited: false };
+
+    public event EventHandler<GameCrashedArgs>? GameCrashed;
 
     public GameLauncherService(
         ISeriesService seriesService,
@@ -68,7 +98,8 @@ public class GameLauncherService : IGameLauncherService
         ILogService logService,
         INotificationService notificationService,
         IMinecraftInstallService minecraftInstall,
-        IForgeInstallService forgeInstall)
+        IForgeInstallService forgeInstall,
+        IAuthService authService)
     {
         _seriesService = seriesService;
         _storageService = storageService;
@@ -77,6 +108,7 @@ public class GameLauncherService : IGameLauncherService
         _notificationService = notificationService;
         _minecraftInstall = minecraftInstall;
         _forgeInstall = forgeInstall;
+        _authService = authService;
     }
 
     // ---------------------------------------------------------------
@@ -139,6 +171,154 @@ public class GameLauncherService : IGameLauncherService
         return null;
     }
 
+    // ---------------------------------------------------------------
+    //  Listado de Javas para la UI + Java requerido por versión de MC:
+    //  <=1.16 → 8 · 1.17–1.20.4 → 17 · >=1.20.5 → 21.
+    // ---------------------------------------------------------------
+    public int GetRequiredJava(string minecraftVersion)
+    {
+        try
+        {
+            var parts = (minecraftVersion ?? string.Empty).Trim().Split('.');
+            if (parts.Length >= 2
+                && int.TryParse(parts[0], out var major)
+                && int.TryParse(parts[1], out var minor))
+            {
+                if (major > 1) return 21;
+                if (major == 1 && minor > 20) return 21;
+                if (major == 1 && minor == 20 && MinorPatchAtLeast(parts, 5))
+                    return 21;
+                if (major == 1 && minor >= 17)
+                    return 17;
+                return 8;
+            }
+        }
+        catch
+        {
+            // Versión ilegible: pedir 17 (caso más común)
+        }
+        return 17;
+    }
+
+    private static bool MinorPatchAtLeast(string[] parts, int patch)
+    {
+        return parts.Length >= 3 && int.TryParse(parts[2], out var p) && p >= patch;
+    }
+
+    public async Task<List<JavaInstall>> ListJavaAsync()
+    {
+        var found = new List<JavaInstall>();
+        foreach (var candidate in await GetJavaCandidates())
+        {
+            var (major, display) = await GetJavaDisplayAsync(candidate);
+            if (major <= 0) continue;
+
+            var path = candidate == "java" ? "java" : Path.GetFullPath(candidate);
+            if (candidate != "java" && !File.Exists(path)) continue;
+            if (found.Any(f => string.Equals(f.Path, path, StringComparison.OrdinalIgnoreCase))) continue;
+
+            found.Add(new JavaInstall
+            {
+                Path = path,
+                Major = major,
+                Display = $"Java {display}"
+            });
+        }
+
+        return found.OrderByDescending(f => f.Major).ThenBy(f => f.Path).ToList();
+    }
+
+    private async Task<List<string>> GetJavaCandidates()
+    {
+        var candidates = new List<string>();
+
+        var settings = await _settingsService.GetSettingsAsync();
+        if (!string.IsNullOrWhiteSpace(settings.JavaPath))
+        {
+            candidates.Add(ResolveJavaExecutable(settings.JavaPath));
+        }
+
+        var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
+        if (!string.IsNullOrWhiteSpace(javaHome))
+        {
+            candidates.Add(Path.Combine(javaHome, "bin", "java.exe"));
+        }
+
+        candidates.Add("java");
+
+        var programFiles = new[]
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs")
+        };
+
+        foreach (var baseDir in programFiles.Where(d => !string.IsNullOrWhiteSpace(d)))
+        {
+            foreach (var dir in SafeEnumerateDirectories(baseDir, "Java", "Eclipse Adoptium", "Microsoft", "Amazon Corretto", "Zulu", "BellSoft", "Eclipse Foundation", "AdoptOpenJDK"))
+            {
+                candidates.Add(Path.Combine(dir, "bin", "java.exe"));
+            }
+        }
+
+        // Javas descargados por el propio launcher
+        var ownJava = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "MineMount", "Java");
+        if (Directory.Exists(ownJava))
+        {
+            try
+            {
+                foreach (var dir in Directory.EnumerateDirectories(ownJava))
+                {
+                    candidates.Add(Path.Combine(dir, "bin", "javaw.exe"));
+                    candidates.Add(Path.Combine(dir, "bin", "java.exe"));
+                }
+            }
+            catch
+            {
+                // Sin permiso: se ignora
+            }
+        }
+
+        return candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static async Task<(int Major, string Display)> GetJavaDisplayAsync(string javaPath)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = javaPath == "java" ? "java" : javaPath,
+                Arguments = "-version",
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var p = Process.Start(psi);
+            if (p == null) return (0, string.Empty);
+
+            var output = await p.StandardError.ReadToEndAsync();
+            p.WaitForExit(5000);
+
+            // openjdk version "17.0.11" ... / java version "1.8.0_412"
+            var match = System.Text.RegularExpressions.Regex.Match(output, "version \"([\\d._]+)\"");
+            if (!match.Success) return (0, string.Empty);
+
+            var raw = match.Groups[1].Value;
+            var first = raw.Split('.')[0];
+            var major = first == "1" && raw.Contains('.')
+                ? int.Parse(raw.Split('.')[1])
+                : int.Parse(first);
+            return (major, raw);
+        }
+        catch
+        {
+            return (0, string.Empty);
+        }
+    }
     private static string ResolveJavaExecutable(string path)
     {
         if (File.Exists(path)) return path;
@@ -361,6 +541,9 @@ public class GameLauncherService : IGameLauncherService
             _runningProcess = process;
             _runningProcess.EnableRaisingEvents = true;
             _runningProcess.Exited += OnGameExited;
+            _lastSeriesId = info.Id;
+            _lastSeriesName = info.Name;
+            _lastGameDir = config.GameDir;
 
             _logService.Info(
                 $"Lanzamiento de {info.Name}: PID {process.Id}, Java {config.JavaPath}, " +
@@ -394,10 +577,12 @@ public class GameLauncherService : IGameLauncherService
 
     private void OnGameExited(object? sender, EventArgs e)
     {
+        int exitCode = -1;
         try
         {
             var process = sender as Process;
-            _logService.Info($"La serie terminó (PID {process?.Id}, código {process?.ExitCode})");
+            exitCode = process?.ExitCode ?? -1;
+            _logService.Info($"La serie terminó (PID {process?.Id}, código {exitCode})");
         }
         catch
         {
@@ -405,6 +590,19 @@ public class GameLauncherService : IGameLauncherService
         }
 
         _runningProcess = null;
+
+        if (exitCode != 0)
+        {
+            GameCrashed?.Invoke(this, new GameCrashedArgs
+            {
+                SeriesId = _lastSeriesId,
+                SeriesName = _lastSeriesName,
+                ExitCode = exitCode,
+                LogPath = string.IsNullOrWhiteSpace(_lastGameDir)
+                    ? string.Empty
+                    : Path.Combine(_lastGameDir, "logs", "latest.log")
+            });
+        }
     }
 
     private static void MinimizeMainWindow()
@@ -438,6 +636,8 @@ public class GameLauncherService : IGameLauncherService
         }
 
         maxRAM = Math.Max(2048, maxRAM);
+
+        var session = _authService.CurrentSession;
 
         // Classpath: client jar + libraries + forge universal jar
         var clientJar = await _minecraftInstall.GetClientJarPathAsync(mcVersion);
@@ -485,30 +685,64 @@ public class GameLauncherService : IGameLauncherService
             GameDir = info.InstallPath,
             AssetsDir = assetsDir,
             AssetIndex = assetIndex,
-            Username = string.IsNullOrWhiteSpace(settings.UserName) ? "Player" : settings.UserName,
-            UUID = Guid.NewGuid().ToString("N"),
+            Username = string.IsNullOrWhiteSpace(session?.Name) ? "Player" : session.Name,
+            UUID = string.IsNullOrWhiteSpace(session?.Uuid) ? Guid.NewGuid().ToString("N") : session.Uuid,
+            AccessToken = string.IsNullOrWhiteSpace(session?.AccessToken) ? "0" : session.AccessToken,
+            UserType = string.IsNullOrWhiteSpace(session?.UserType) ? "legacy" : session.UserType,
+            JvmArgs = settings.JvmArgs?.Trim() ?? string.Empty,
+            Fullscreen = settings.Fullscreen,
+            Width = ParseResolution(settings.Resolution).Width,
+            Height = ParseResolution(settings.Resolution).Height,
             MinimizeLauncher = settings.MinimizeOnLaunch
         };
+    }
+
+    private static (int Width, int Height) ParseResolution(string? resolution)
+    {
+        try
+        {
+            var parts = (resolution ?? string.Empty).Split('x');
+            if (parts.Length == 2
+                && int.TryParse(parts[0], out var w)
+                && int.TryParse(parts[1], out var h)
+                && w >= 640 && w <= 7680 && h >= 480 && h <= 4320)
+            {
+                return (w, h);
+            }
+        }
+        catch
+        {
+            // Resolución inválida: se usan los valores por defecto del juego
+        }
+        return (0, 0);
     }
 
     private static string BuildArguments(SeriesLaunchConfig config)
     {
         // Forge 1.20.1 usa launchwrapper con FMLTweaker.
         // El classpath y los args se construyen desde la configuración.
-        return $"-Xms{config.MinRAM}M " +
-               $"-Xmx{config.MaxRAM}M " +
-               $"-Djava.library.path=\"{config.NativesDir}\" " +
-               $"-cp \"{config.Classpath}\" " +
-               "net.minecraft.launchwrapper.Launch " +
-               $"--username {config.Username} " +
-               $"--version {config.MinecraftVersion}-forge " +
-               $"--gameDir \"{config.GameDir}\" " +
-               $"--assetsDir \"{config.AssetsDir}\" " +
-               $"--assetIndex {config.AssetIndex} " +
-               $"--uuid {config.UUID} " +
-               "--accessToken 0 " +
-               "--userType legacy " +
-               "--tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker";
+        var gameArgs = $"--username {config.Username} " +
+                $"--version {config.MinecraftVersion}-forge " +
+                $"--gameDir \"{config.GameDir}\" " +
+                $"--assetsDir \"{config.AssetsDir}\" " +
+                $"--assetIndex {config.AssetIndex} " +
+                $"--uuid {config.UUID} " +
+                $"--accessToken {config.AccessToken} " +
+                $"--userType {config.UserType} " +
+                "--tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker";
+
+        if (config.Fullscreen) gameArgs += " --fullscreen";
+        if (config.Width > 0 && config.Height > 0)
+            gameArgs += $" --width {config.Width} --height {config.Height}";
+
+        var jvm = $"-Xms{config.MinRAM}M -Xmx{config.MaxRAM}M";
+        if (!string.IsNullOrWhiteSpace(config.JvmArgs)) jvm += " " + config.JvmArgs;
+
+        return $"{jvm} " +
+                $"-Djava.library.path=\"{config.NativesDir}\" " +
+                $"-cp \"{config.Classpath}\" " +
+                "net.minecraft.launchwrapper.Launch " +
+                gameArgs;
     }
 
     private static long GetAvailablePhysicalMemoryMB()

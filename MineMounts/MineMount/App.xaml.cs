@@ -94,6 +94,10 @@ public partial class App : Application
         services.AddSingleton<IMinecraftInstallService, MinecraftInstallService>();
         services.AddSingleton<IForgeInstallService, ForgeInstallService>();
         services.AddSingleton<ISoundService, SoundService>();
+        services.AddSingleton<IMicrosoftAuthService, MicrosoftAuthService>();
+        services.AddSingleton<ISystemInfoService, SystemInfoService>();
+        services.AddSingleton<IJavaDownloaderService, JavaDownloaderService>();
+        services.AddSingleton<IAppearanceService, AppearanceService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
@@ -103,9 +107,11 @@ public partial class App : Application
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<SeriesViewModel>();
         services.AddSingleton<SeriesDetailViewModel>();
+        services.AddTransient<WelcomeViewModel>();
 
         // Views
         services.AddSingleton<MainWindow>();
+        services.AddTransient<WelcomeWindow>();
         services.AddTransient<HomeView>();
         services.AddTransient<GamesView>();
         services.AddTransient<ServersView>();
@@ -120,6 +126,26 @@ public partial class App : Application
 
         // Cargar configuración antes de construir las vistas (evita carreras de carga)
         await _host.Services.GetRequiredService<ISettingsService>().LoadAsync();
+
+        // Tema e idioma guardados
+        await _host.Services.GetRequiredService<IAppearanceService>().ApplyAsync();
+
+        // Sesión guardada (con renovación de token en segundo plano si es Microsoft)
+        var auth = _host.Services.GetRequiredService<IAuthService>();
+        var restored = await auth.TryRestoreAsync();
+
+        // Bienvenida solo si no hay cuenta guardada
+        if (!restored || !auth.IsAuthenticated)
+        {
+            var welcome = _host.Services.GetRequiredService<Views.WelcomeWindow>();
+            welcome.ShowDialog();
+            var session = await welcome.ViewModel.Done.Task;
+            if (session == null || !auth.IsAuthenticated)
+            {
+                Shutdown();
+                return;
+            }
+        }
 
         // Pantalla de carga con tareas reales (10-18 s, sin congelar la UI)
         var splash = new Views.SplashScreen(

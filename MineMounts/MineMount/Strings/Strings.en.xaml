@@ -1,0 +1,244 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- English -->
+
+    <sys:String x:Key="S.Status.ComingSoon">Coming soon</sys:String>
+    <sys:String x:Key="S.Status.NotInstalled">NOT INSTALLED</sys:String>
+    <sys:String x:Key="S.Status.Installed">INSTALLED</sys:String>
+    <sys:String x:Key="S.Status.UpdateAvailable">UPDATE AVAILABLE</sys:String>
+    <sys:String x:Key="S.Status.MissingFiles">MISSING FILES</sys:String>
+
+    <sys:String x:Key="S.Nav.Home">Home</sys:String>
+    <sys:String x:Key="S.Nav.Series">Series</sys:String>
+    <sys:String x:Key="S.Nav.Settings">Settings</sys:String>
+
+    <sys:String x:Key="S.Play">PLAY</sys:String>
+    <sys:String x:Key="S.Install">INSTALL</sys:String>
+    <sys:String x:Key="S.Update">UPDATE</sys:String>
+    <sys:String x:Key="S.Repair">REPAIR</sys:String>
+    <sys:String x:Key="S.Playing">PLAYING</sys:String>
+    <sys:String x:Key="S.Retry">RETRY</sys:String>
+    <sys:String x:Key="S.ComingSoon">COMING SOON</sys:String>
+    <sys:String x:Key="S.NoSeries">NO SERIES</sys:String>
+    <sys:String x:Key="S.Loading">LOADING…</sys:String>
+    <sys:String x:Key="S.Installing">INSTALLING…</sys:String>
+    <sys:String x:Key="S.Updating">UPDATING…</sys:String>
+    <sys:String x:Key="S.Repairing">REPAIRING…</sys:String>
+    <sys:String x:Key="S.Starting">STARTING…</sys:String>
+    <sys:String x:Key="S.Play.Searching">Looking for series…</sys:String>
+    <sys:String x:Key="S.Play.NoCatalog">No series in the catalog</sys:String>
+    <sys:String x:Key="S.Play.Connect">Connect to see the series</sys:String>
+    <sys:String x:Key="S.Play.Preparing">Preparing…</sys:String>
+    <sys:String x:Key="S.Play.StartingPct">Starting… {0:F0}%</sys:String>
+    <sys:String x:Key="S.Play.Step">Step {0}/{1} · {2} · {3:F0}%</sys:String>
+    <sys:String x:Key="S.Play.CouldNotStart">Could not start the series.</sys:String>
+    <sys:String x:Key="S.Play.ReadyList">{0} ready</sys:String>
+    <sys:String x:Key="S.Play.Running">{0} running</sys:String>
+    <sys:String x:Key="S.Play.Mods">{0} mods</sys:String>
+    <sys:String x:Key="S.Play.Updated">Upd. {0:MM/dd/yyyy}</sys:String>
+    <sys:String x:Key="S.Play.Head.Installed">Installed</sys:String>
+    <sys:String x:Key="S.Play.Head.Available">Available</sys:String>
+    <sys:String x:Key="S.Play.Head.UpdateReady">Update ready</sys:String>
+    <sys:String x:Key="S.Play.Head.Missing">Missing files</sys:String>
+    <sys:String x:Key="S.Update.AvailableFor">Update available: {0} v{1}</sys:String>
+
+    <sys:String x:Key="S.Serie">SERIES</sys:String>
+    <sys:String x:Key="S.NoSeriesLine">No series</sys:String>
+
+    <sys:String x:Key="S.Promo.Event">Next event</sys:String>
+    <sys:String x:Key="S.Promo.EventSub">Premiere night · see Series</sys:String>
+    <sys:String x:Key="S.Promo.Discord">Discord</sys:String>
+    <sys:String x:Key="S.Promo.DiscordSub">Join the community</sys:String>
+    <sys:String x:Key="S.Promo.Updates">Updates</sys:String>
+    <sys:String x:Key="S.Promo.UpdatesSub">Check launcher news</sys:String>
+    <sys:String x:Key="S.Discord.NotConfigured">Discord not configured</sys:String>
+    <sys:String x:Key="S.Discord.ConfigureHint">Paste the invite in Settings → Community.</sys:String>
+
+    <sys:String x:Key="S.Home.Welcome">WELCOME TO MINEMOUNT</sys:String>
+    <sys:String x:Key="S.Home.Subtitle">Discover, install and manage your series from one place</sys:String>
+    <sys:String x:Key="S.Home.Launcher">MINEMOUNT · LAUNCHER</sys:String>
+
+    <sys:String x:Key="S.Series.Title">SERIES</sys:String>
+    <sys:String x:Key="S.Series.None">No series available</sys:String>
+    <sys:String x:Key="S.Series.Check">Check your connection or refresh the catalog</sys:String>
+    <sys:String x:Key="S.Series.Single">1 series available</sys:String>
+    <sys:String x:Key="S.Series.Many">{0} series available</sys:String>
+    <sys:String x:Key="S.Series.Loading">Loading series…</sys:String>
+    <sys:String x:Key="S.Series.Error">Failed to load series</sys:String>
+    <sys:String x:Key="S.Series.Refresh">Refresh series</sys:String>
+    <sys:String x:Key="S.Series.Selected">Selected</sys:String>
+    <sys:String x:Key="S.Series.MoreSoon">More series coming soon</sys:String>
+    <sys:String x:Key="S.Series.MenuRepair">Repair installation</sys:String>
+    <sys:String x:Key="S.Series.MenuOpen">Open folder</sys:String>
+    <sys:String x:Key="S.Series.MenuUninstall">Uninstall</sys:String>
+    <sys:String x:Key="S.Series.UninstallTitle">Uninstall series</sys:String>
+    <sys:String x:Key="S.Series.UninstallMsg">Uninstall {0}? Its files will be deleted (catalog untouched).</sys:String>
+    <sys:String x:Key="S.Series.Uninstalled">{0} uninstalled</sys:String>
+    <sys:String x:Key="S.Series.Changelog">What's new in v{0}</sys:String>
+    <sys:String x:Key="S.Series.MCLine">Minecraft {0} · {1} · v{2}</sys:String>
+    <sys:String x:Key="S.Crash.Title">The game closed</sys:String>
+    <sys:String x:Key="S.Crash.Msg">The game closed (code {0}). See the error?</sys:String>
+    <sys:String x:Key="S.Crash.View">See error</sys:String>
+
+    <sys:String x:Key="S.Welcome.Title">Welcome to MineMount</sys:String>
+    <sys:String x:Key="S.Welcome.Sub">Choose how you want to play. You can change it anytime.</sys:String>
+    <sys:String x:Key="S.Welcome.MS">Sign in with Microsoft</sys:String>
+    <sys:String x:Key="S.Welcome.MSDesc">Official Minecraft (Java) account. The browser opens; you never type your password here.</sys:String>
+    <sys:String x:Key="S.Welcome.MSGo">Continue with Microsoft</sys:String>
+    <sys:String x:Key="S.Welcome.Offline">Offline mode</sys:String>
+    <sys:String x:Key="S.Welcome.OfflineDesc">Just your name, no password.</sys:String>
+    <sys:String x:Key="S.Welcome.OfflineWarn">Only works on servers with offline mode enabled.</sys:String>
+    <sys:String x:Key="S.Welcome.Name">Username</sys:String>
+    <sys:String x:Key="S.Welcome.NameHint">3 to 16 chars: letters, numbers and underscore</sys:String>
+    <sys:String x:Key="S.Welcome.Continue">Continue</sys:String>
+    <sys:String x:Key="S.Welcome.CodeTitle">Finish login in the browser</sys:String>
+    <sys:String x:Key="S.Welcome.CodeHint">Enter this code on the Microsoft page:</sys:String>
+    <sys:String x:Key="S.Welcome.OpenBrowser">Open browser</sys:String>
+    <sys:String x:Key="S.Welcome.Waiting">Waiting for confirmation…</sys:String>
+    <sys:String x:Key="S.Welcome.Cancel">Cancel</sys:String>
+    <sys:String x:Key="S.Welcome.MSError">Could not complete login.</sys:String>
+    <sys:String x:Key="S.Auth.Microsoft">Microsoft</sys:String>
+    <sys:String x:Key="S.Auth.Offline">Offline</sys:String>
+    <sys:String x:Key="S.Account.Change">Switch account</sys:String>
+    <sys:String x:Key="S.Account.Logout">Sign out</sys:String>
+    <sys:String x:Key="S.Account.Type">Account type</sys:String>
+
+    <sys:String x:Key="S.Settings.Title">SETTINGS</sys:String>
+    <sys:String x:Key="S.Settings.Saved">Saved ✓</sys:String>
+    <sys:String x:Key="S.Settings.Reset">Reset to defaults</sys:String>
+    <sys:String x:Key="S.Settings.Account">ACCOUNT</sys:String>
+    <sys:String x:Key="S.Settings.AccountDesc">Who plays on this launcher.</sys:String>
+    <sys:String x:Key="S.Settings.Game">GAME</sys:String>
+    <sys:String x:Key="S.Settings.GameDesc">Memory, Java and game folder.</sys:String>
+    <sys:String x:Key="S.Settings.Series">SERIES</sys:String>
+    <sys:String x:Key="S.Settings.SeriesDesc">Where series install and how much they use.</sys:String>
+    <sys:String x:Key="S.Settings.Background">BACKGROUND</sys:String>
+    <sys:String x:Key="S.Settings.BackgroundDesc">Launcher background image.</sys:String>
+    <sys:String x:Key="S.Settings.Appearance">APPEARANCE</sys:String>
+    <sys:String x:Key="S.Settings.AppearanceDesc">Animations, sound, theme and language.</sys:String>
+    <sys:String x:Key="S.Settings.Downloads">DOWNLOADS</sys:String>
+    <sys:String x:Key="S.Settings.DownloadsDesc">Speed and concurrency limits.</sys:String>
+    <sys:String x:Key="S.Settings.Diag">DIAGNOSTICS</sys:String>
+    <sys:String x:Key="S.Settings.DiagDesc">Logs and tools for when something breaks.</sys:String>
+    <sys:String x:Key="S.Settings.About">ABOUT</sys:String>
+    <sys:String x:Key="S.Settings.AboutDesc">Version and updates.</sys:String>
+    <sys:String x:Key="S.Settings.Community">COMMUNITY</sys:String>
+    <sys:String x:Key="S.Settings.CommunityDesc">Discord and your profile presence.</sys:String>
+
+    <sys:String x:Key="S.Game.Ram">Assigned RAM</sys:String>
+    <sys:String x:Key="S.Game.RamTotal">Total RAM detected: {0} GB</sys:String>
+    <sys:String x:Key="S.Game.Recommended">Recommended</sys:String>
+    <sys:String x:Key="S.Game.Auto">Automatic</sys:String>
+    <sys:String x:Key="S.Game.RamWarn">You're assigning over 75% of your RAM: the system may slow down.</sys:String>
+    <sys:String x:Key="S.Game.Java">Java</sys:String>
+    <sys:String x:Key="S.Game.JavaDetected">Detected: {0} · {1}</sys:String>
+    <sys:String x:Key="S.Game.JavaNone">No compatible Java found.</sys:String>
+    <sys:String x:Key="S.Game.JavaDownload">Download Java automatically</sys:String>
+    <sys:String x:Key="S.Game.JavaRedetect">Detect again</sys:String>
+    <sys:String x:Key="S.Game.JavaManual">Change manually</sys:String>
+    <sys:String x:Key="S.Game.Dir">Game directory</sys:String>
+    <sys:String x:Key="S.Game.OpenFolder">Open folder</sys:String>
+    <sys:String x:Key="S.Game.Change">Change</sys:String>
+    <sys:String x:Key="S.Game.CloseOnLaunch">Close the launcher while playing</sys:String>
+    <sys:String x:Key="S.Game.MinimizeOnLaunch">Minimize while playing</sys:String>
+    <sys:String x:Key="S.Game.Fullscreen">Fullscreen</sys:String>
+    <sys:String x:Key="S.Game.Resolution">Resolution</sys:String>
+    <sys:String x:Key="S.Game.Jvm">Advanced JVM arguments</sys:String>
+
+    <sys:String x:Key="S.SeriesS.Folder">Install folder</sys:String>
+    <sys:String x:Key="S.SeriesS.Used">Space used by series: {0}</sys:String>
+    <sys:String x:Key="S.SeriesS.Free">Free disk space: {0}</sys:String>
+    <sys:String x:Key="S.SeriesS.Move">Move installation</sys:String>
+    <sys:String x:Key="S.SeriesS.MoveConfirm">Move the series to the new folder? Files are copied and verified before deleting the source.</sys:String>
+    <sys:String x:Key="S.SeriesS.Moved">Installation moved successfully.</sys:String>
+    <sys:String x:Key="S.SeriesS.Repair">Repair installation</sys:String>
+    <sys:String x:Key="S.SeriesS.DefaultHint">Empty uses the default: %APPDATA%\MineMount\Series</sys:String>
+
+    <sys:String x:Key="S.Bg.Mode">Background mode</sys:String>
+    <sys:String x:Key="S.Bg.Auto">Automatic rotation</sys:String>
+    <sys:String x:Key="S.Bg.Fixed">Fixed background</sys:String>
+    <sys:String x:Key="S.Bg.Off">Disabled (low-end PCs)</sys:String>
+    <sys:String x:Key="S.Bg.Interval">Change every {0} seconds</sys:String>
+    <sys:String x:Key="S.Bg.Pick">Choose the fixed background</sys:String>
+    <sys:String x:Key="S.Bg.AddMine">Add my image</sys:String>
+    <sys:String x:Key="S.Bg.Dim">Dim background: {0}%</sys:String>
+    <sys:String x:Key="S.Bg.Blur">Blur: {0}px</sys:String>
+    <sys:String x:Key="S.Bg.Note">Images are bundled and work offline.</sys:String>
+
+    <sys:String x:Key="S.Ap.Animations">Enable animations</sys:String>
+    <sys:String x:Key="S.Ap.Particles">Floating particles (purple dust)</sys:String>
+    <sys:String x:Key="S.Ap.ClickSound">Button click sound</sys:String>
+    <sys:String x:Key="S.Ap.Volume">Volume: {0}%</sys:String>
+    <sys:String x:Key="S.Ap.Theme">Theme</sys:String>
+    <sys:String x:Key="S.Ap.Dark">Dark</sys:String>
+    <sys:String x:Key="S.Ap.Light">Light</sys:String>
+    <sys:String x:Key="S.Ap.Language">Language</sys:String>
+    <sys:String x:Key="S.Ap.Spanish">Español</sys:String>
+    <sys:String x:Key="S.Ap.English">English</sys:String>
+
+    <sys:String x:Key="S.Dl.Speed">Speed limit</sys:String>
+    <sys:String x:Key="S.Dl.Unlimited">Unlimited</sys:String>
+    <sys:String x:Key="S.Dl.SpeedVal">{0} KB/s</sys:String>
+    <sys:String x:Key="S.Dl.Concurrent">Simultaneous downloads: {0}</sys:String>
+
+    <sys:String x:Key="S.Diag.ViewLogs">View logs</sys:String>
+    <sys:String x:Key="S.Diag.Export">Export diagnostics</sys:String>
+    <sys:String x:Key="S.Diag.CleanCache">Clear cache</sys:String>
+    <sys:String x:Key="S.Diag.Cleaned">Cache cleared: {0} freed.</sys:String>
+    <sys:String x:Key="S.Diag.Exported">Diagnostics exported.</sys:String>
+    <sys:String x:Key="S.Log.Title">Logs</sys:String>
+    <sys:String x:Key="S.Log.Launcher">Launcher</sys:String>
+    <sys:String x:Key="S.Log.Game">Game</sys:String>
+    <sys:String x:Key="S.Log.Refresh">Refresh</sys:String>
+    <sys:String x:Key="S.Log.Copy">Copy</sys:String>
+    <sys:String x:Key="S.Log.OpenFolder">Open folder</sys:String>
+
+    <sys:String x:Key="S.About.Version">Launcher version: {0}</sys:String>
+    <sys:String x:Key="S.About.Check">Check for updates</sys:String>
+    <sys:String x:Key="S.About.UpToDate">You're up to date.</sys:String>
+    <sys:String x:Key="S.About.Available">Update available: v{0}</sys:String>
+    <sys:String x:Key="S.About.Changelog">What's new</sys:String>
+
+    <sys:String x:Key="S.Com.DiscordUrl">Discord invite URL</sys:String>
+    <sys:String x:Key="S.Com.DiscordHint">The Discord card in the bottom bar opens this link.</sys:String>
+    <sys:String x:Key="S.Com.ClientId">Discord app ID (Rich Presence)</sys:String>
+    <sys:String x:Key="S.Com.ClientIdHint">Create it at discord.com/developers. Empty = presence off.</sys:String>
+
+    <sys:String x:Key="S.Common.Save">Save</sys:String>
+    <sys:String x:Key="S.Common.Cancel">Cancel</sys:String>
+    <sys:String x:Key="S.Common.Close">Close</sys:String>
+    <sys:String x:Key="S.Common.Yes">Yes</sys:String>
+    <sys:String x:Key="S.Common.No">No</sys:String>
+    <sys:String x:Key="S.Common.Refresh">Refresh</sys:String>
+    <sys:String x:Key="S.Common.Error">Error</sys:String>
+    <sys:String x:Key="S.Common.UpdateNow">UPDATE</sys:String>
+    <sys:String x:Key="S.Common.Minimize">Minimize</sys:String>
+    <sys:String x:Key="S.Common.Maximize">Maximize</sys:String>
+    <sys:String x:Key="S.Common.Restore">Restore</sys:String>
+    <sys:String x:Key="S.Common.CloseApp">Close</sys:String>
+    <sys:String x:Key="S.Common.NewsPrev">Previous news</sys:String>
+    <sys:String x:Key="S.Common.NewsNext">Next news</sys:String>
+
+    <sys:String x:Key="S.Splash.Loading">Loading…</sys:String>
+    <sys:String x:Key="S.Splash.Ready">Ready</sys:String>
+    <sys:String x:Key="S.Splash.S1">Loading settings…</sys:String>
+    <sys:String x:Key="S.Splash.S2">Checking for updates…</sys:String>
+    <sys:String x:Key="S.Splash.S3">Checking series installation…</sys:String>
+    <sys:String x:Key="S.Splash.S4">Starting services…</sys:String>
+    <sys:String x:Key="S.Splash.S5">Loading resources…</sys:String>
+    <sys:String x:Key="S.Splash.S6">Finishing…</sys:String>
+    <sys:String x:Key="S.Splash.Downloading">Downloading {0}…</sys:String>
+    <sys:String x:Key="S.Splash.Installing">Installing update…</sys:String>
+
+    <sys:String x:Key="S.News.Nse.Title">NSE6 is out now</sys:String>
+    <sys:String x:Key="S.News.Nse.Desc">Check out what's new in the series.</sys:String>
+    <sys:String x:Key="S.News.Welcome.Title">Welcome to MineMount</sys:String>
+    <sys:String x:Key="S.News.Welcome.Desc">The modern launcher for your series. Explore, install and customize.</sys:String>
+    <sys:String x:Key="S.News.System.Title">Brand-new series system</sys:String>
+    <sys:String x:Key="S.News.System.Desc">Install, update and repair full series with mods and resources.</sys:String>
+    <sys:String x:Key="S.News.Soon.Title">More series coming soon</sys:String>
+    <sys:String x:Key="S.News.Soon.Desc">We're preparing more series for you to enjoy in one place.</sys:String>
+
+</ResourceDictionary>
