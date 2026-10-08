@@ -552,6 +552,22 @@
                                         Margin="8,0,0,0" Padding="14,6"
                                         Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}" />
                             </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="{DynamicResource S.About.DownloadSetup}"
+                                        Command="{Binding DownloadSetupCommand}"
+                                        Style="{StaticResource Button.Icon}" Padding="14,6"
+                                        Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <TextBlock Text="{DynamicResource S.About.SetupHint}"
+                                           Style="{StaticResource TextBlock.Caption}"
+                                           VerticalAlignment="Center" Margin="10,0,0,0"
+                                           TextWrapping="Wrap"
+                                           Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,8,0,0"
+                                        Visibility="{Binding IsDownloadingSetup, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding SetupProgress, Mode=OneWay}"
+                                             Height="8" Style="{StaticResource ProgressBar.Glow}" />
+                            </StackPanel>
                             <StackPanel Margin="0,8,0,0"
                                         Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <ProgressBar Minimum="0" Maximum="100" Value="{Binding UpdateProgress, Mode=OneWay}"

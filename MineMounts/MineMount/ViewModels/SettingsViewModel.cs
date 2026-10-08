@@ -53,6 +53,7 @@ public partial class SettingsViewModel : ObservableObject
         nameof(IsLoadingSpace), nameof(InstalledSeries), nameof(IsRepairing),
         nameof(RepairProgress), nameof(AvailableBackgrounds), nameof(CacheSize),
         nameof(IsExporting), nameof(IsCheckingUpdates), nameof(IsUpdating),
+        nameof(IsDownloadingSetup), nameof(SetupProgress),
         nameof(IsUpdateAvailable), nameof(UpdateProgress), nameof(UpdateInfo), nameof(AccountAvatar),
         nameof(AccountKindLabel), nameof(SpeedLabel), nameof(AccountName)
     };
@@ -245,6 +246,12 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isCheckingUpdates;
+
+    [ObservableProperty]
+    private bool _isDownloadingSetup;
+
+    [ObservableProperty]
+    private double _setupProgress;
 
     [ObservableProperty]
     private bool _isUpdating;
@@ -1062,6 +1069,35 @@ public partial class SettingsViewModel : ObservableObject
         finally
         {
             IsCheckingUpdates = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task DownloadSetupAsync()
+    {
+        if (IsDownloadingSetup) return;
+        IsDownloadingSetup = true;
+        SetupProgress = 0;
+        try
+        {
+            var progress = new Progress<double>(p => SetupProgress = p);
+            var path = await _updateService.DownloadSetupAsync(progress);
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            }
+            else
+            {
+                UpdateInfo = _updateService.LastError;
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateInfo = ex.Message;
+        }
+        finally
+        {
+            IsDownloadingSetup = false;
         }
     }
 

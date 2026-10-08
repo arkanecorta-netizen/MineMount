@@ -200,6 +200,8 @@
 
     <sys:String x:Key="S.About.Version">Launcher version: {0}</sys:String>
     <sys:String x:Key="S.About.Check">Check for updates</sys:String>
+    <sys:String x:Key="S.About.DownloadSetup">Download installer</sys:String>
+    <sys:String x:Key="S.About.SetupHint">If auto-update fails, install manually with the installer.</sys:String>
     <sys:String x:Key="S.About.UpToDate">You're up to date.</sys:String>
     <sys:String x:Key="S.About.Available">Update available: v{0}</sys:String>
     <sys:String x:Key="S.About.Changelog">What's new</sys:String>

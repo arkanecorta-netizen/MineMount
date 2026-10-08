@@ -65,6 +65,13 @@ public class AppearanceService : IAppearanceService
         try
         {
             // Solo oscuro: asegura que el diccionario claro no quede cargado.
+            // Se crea primero y se reemplaza después: si algo falla, la UI
+            // nunca queda sin diccionario (pantalla en blanco).
+            var fresh = new ResourceDictionary
+            {
+                Source = new Uri("Styles/Colors.xaml", UriKind.Relative)
+            };
+
             var dicts = Application.Current.Resources.MergedDictionaries;
             var light = dicts.FirstOrDefault(d =>
                 d.Source != null && d.Source.OriginalString.Contains("Colors.Light"));
@@ -72,11 +79,8 @@ public class AppearanceService : IAppearanceService
 
             var dark = dicts.FirstOrDefault(d =>
                 d.Source != null && d.Source.OriginalString.EndsWith("Styles/Colors.xaml"));
-            if (dark == null)
-                dicts.Insert(0, new ResourceDictionary
-                {
-                    Source = new Uri("Styles/Colors.xaml", UriKind.Relative)
-                });
+            if (dark != null) dicts.Remove(dark);
+            dicts.Insert(0, fresh);
 
             ThemeChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -93,12 +97,15 @@ public class AppearanceService : IAppearanceService
             var isEnglish = language.StartsWith("en", StringComparison.OrdinalIgnoreCase);
             var want = isEnglish ? "Strings/Strings.en.xaml" : "Strings/Strings.es.xaml";
 
+            // Crear primero: si falla, se conserva el idioma actual.
+            var fresh = new ResourceDictionary { Source = new Uri(want, UriKind.Relative) };
+
             var dicts = Application.Current.Resources.MergedDictionaries;
             var current = dicts.FirstOrDefault(d =>
                 d.Source != null && d.Source.OriginalString.Contains("Strings/Strings."));
             if (current != null) dicts.Remove(current);
 
-            dicts.Add(new ResourceDictionary { Source = new Uri(want, UriKind.Relative) });
+            dicts.Add(fresh);
             LanguageChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)

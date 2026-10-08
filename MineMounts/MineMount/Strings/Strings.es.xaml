@@ -209,6 +209,8 @@
 
     <sys:String x:Key="S.About.Version">Versión del launcher: {0}</sys:String>
     <sys:String x:Key="S.About.Check">Buscar actualizaciones</sys:String>
+    <sys:String x:Key="S.About.DownloadSetup">Descargar instalador</sys:String>
+    <sys:String x:Key="S.About.SetupHint">Si la actualización automática falla, instalá manualmente con el instalador.</sys:String>
     <sys:String x:Key="S.About.UpToDate">Estás al día.</sys:String>
     <sys:String x:Key="S.About.Available">Hay una actualización: v{0}</sys:String>
     <sys:String x:Key="S.About.Changelog">Novedades de la versión</sys:String>

@@ -19,6 +19,7 @@ public interface IUpdateService
 {
     Task<bool> CheckForUpdatesAsync();
     Task<bool> DownloadUpdateAsync(IProgress<double>? progress = null);
+    Task<string?> DownloadSetupAsync(IProgress<double>? progress = null, CancellationToken cancellationToken = default);
     bool ApplyAndRestart();
     string CurrentVersion { get; }
     string LatestVersion { get; }
@@ -33,6 +34,7 @@ public class UpdateService : IUpdateService
     private const string RepoOwner = "arkanecorta-netizen";
     private const string RepoName = "MineMount";
     private const string PackageName = "MineMount-Update.zip";
+    private const string SetupAssetName = "MineMount-Setup.exe";
     private const int MaxApplyAttempts = 2;
 
     private static readonly HttpClient Http = new()
@@ -45,6 +47,7 @@ public class UpdateService : IUpdateService
     private readonly string _appDataDir;
 
     private Uri? _packageUrl;
+    private Uri? _setupUrl;
     private string? _expectedSha256;
 
     public UpdateService(ILogService logService, INotificationService notifications)
@@ -77,6 +80,7 @@ public class UpdateService : IUpdateService
         IsUpdateAvailable = false;
         LastError = string.Empty;
         _packageUrl = null;
+        _setupUrl = null;
         _expectedSha256 = null;
 
         var url = $"{ApiBase}/repos/{RepoOwner}/{RepoName}/releases/latest";
@@ -142,23 +146,24 @@ public class UpdateService : IUpdateService
                 foreach (var asset in assets.EnumerateArray())
                 {
                     var name = asset.TryGetProperty("name", out var n) ? n.GetString() : null;
-                    if (!string.Equals(name, PackageName, StringComparison.OrdinalIgnoreCase))
-                        continue;
+                    if (string.IsNullOrWhiteSpace(name)) continue;
 
                     var downloadUrl = asset.TryGetProperty("browser_download_url", out var u)
                         ? u.GetString()
                         : null;
+                    if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri)) continue;
 
-                    if (Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri))
+                    if (string.Equals(name, PackageName, StringComparison.OrdinalIgnoreCase))
                     {
                         _packageUrl = uri;
+                        _expectedSha256 = asset.TryGetProperty("digest", out var d)
+                            ? d.GetString()?.Replace("sha256:", string.Empty, StringComparison.OrdinalIgnoreCase)
+                            : null;
                     }
-
-                    _expectedSha256 = asset.TryGetProperty("digest", out var d)
-                        ? d.GetString()?.Replace("sha256:", string.Empty, StringComparison.OrdinalIgnoreCase)
-                        : null;
-
-                    break;
+                    else if (string.Equals(name, SetupAssetName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _setupUrl = uri;
+                    }
                 }
             }
 
@@ -220,6 +225,31 @@ public class UpdateService : IUpdateService
         {
             Directory.CreateDirectory(StageDir);
             var zipPath = Path.Combine(StageDir, PackageName);
+
+            // Si un intento anterior ya dejó el ZIP válido en staging, no se
+            // vuelve a descargar (evita el bucle "descarga → falla → descarga").
+            if (File.Exists(zipPath) && !string.IsNullOrWhiteSpace(_expectedSha256))
+            {
+                try
+                {
+                    await using var existing = File.OpenRead(zipPath);
+                    var existingHash = Convert.ToHexString(
+                        await SHA256.HashDataAsync(existing, CancellationToken.None));
+                    if (string.Equals(existingHash, _expectedSha256, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _log.Info("Paquete ya en staging y verificado: se omite la descarga");
+                        progress?.Report(100);
+                        return true;
+                    }
+
+                    _log.Warning("ZIP en staging corrupto: se descarga de nuevo");
+                    File.Delete(zipPath);
+                }
+                catch (Exception ex)
+                {
+                    _log.Warning($"No se pudo verificar el ZIP en staging: {ex.Message}");
+                }
+            }
 
             _log.Info($"Descargando actualización desde {_packageUrl}");
 
@@ -343,6 +373,79 @@ public class UpdateService : IUpdateService
             LastError = "Error al descargar la actualización";
             _log.Error("Download failed", ex);
             return false;
+        }
+    }
+
+    // ---------------------------------------------------------------
+    //  2b. Instalador completo como plan B (si el auto-update falla en
+    //  bucle, el usuario lo ejecuta a mano: el instalador sí eleva bien)
+    // ---------------------------------------------------------------
+    public async Task<string?> DownloadSetupAsync(
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (_setupUrl is null)
+        {
+            LastError = "La release no incluye el instalador";
+            _log.Warning("DownloadSetup: sin URL de setup");
+            return null;
+        }
+
+        try
+        {
+            var downloads = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Downloads");
+            Directory.CreateDirectory(downloads);
+            var destPath = Path.Combine(downloads, $"MineMount-Setup-{LatestVersion}.exe");
+
+            _log.Info($"Descargando instalador desde {_setupUrl}");
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromMinutes(30));
+            using var req = new HttpRequestMessage(HttpMethod.Get, _setupUrl);
+            req.Headers.UserAgent.ParseAdd("MineMount-Updater/1.0");
+
+            using var resp = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            if (!resp.IsSuccessStatusCode)
+            {
+                LastError = $"No se pudo descargar el instalador (HTTP {(int)resp.StatusCode})";
+                return null;
+            }
+
+            var total = resp.Content.Headers.ContentLength ?? -1;
+            long received = 0;
+
+            await using var input = await resp.Content.ReadAsStreamAsync(cts.Token);
+            await using var output = File.Create(destPath);
+            var buffer = new byte[81920];
+            int read;
+
+            using (await DownloadLimiter.AcquireAsync(cts.Token))
+            {
+                while ((read = await input.ReadAsync(buffer, cts.Token)) > 0)
+                {
+                    await DownloadLimiter.ThrottleAsync(read, cts.Token);
+                    await output.WriteAsync(buffer.AsMemory(0, read), cts.Token);
+                    received += read;
+                    if (total > 0) progress?.Report(received * 100.0 / total);
+                }
+            }
+
+            progress?.Report(100);
+            _log.Info($"Instalador descargado: {destPath}");
+            return destPath;
+        }
+        catch (OperationCanceledException)
+        {
+            LastError = "Descarga cancelada";
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LastError = "No se pudo descargar el instalador";
+            _log.Error("DownloadSetup failed", ex);
+            return null;
         }
     }
 
