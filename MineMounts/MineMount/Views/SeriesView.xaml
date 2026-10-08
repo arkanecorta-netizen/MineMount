@@ -382,29 +382,6 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-
-                <!-- Tarjeta vacía punteada -->
-                <Border Margin="0,2,14,0" Padding="22" CornerRadius="14"
-                        Background="Transparent"
-                        Visibility="{Binding HasSeries, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <Border.BorderBrush>
-                        <SolidColorBrush Color="#44FFFFFF" />
-                    </Border.BorderBrush>
-                    <Border.BorderThickness>1</Border.BorderThickness>
-                    <Grid>
-                        <Rectangle Stroke="#66FFFFFF" StrokeThickness="1"
-                                   StrokeDashArray="8,6" RadiusX="12" RadiusY="12" />
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <ContentControl Content="{StaticResource IconSparkles}"
-                                            Width="22" Height="22" VerticalAlignment="Center"
-                                            Opacity="0.8" />
-                            <TextBlock Text="{DynamicResource S.Series.MoreSoon}"
-                                       Foreground="#FFD1D5DB" FontSize="14" FontWeight="SemiBold"
-                                       Margin="10,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
             </StackPanel>
         </ScrollViewer>
     </Grid>

@@ -103,6 +103,8 @@
     <sys:String x:Key="S.Welcome.Continue">Continuar</sys:String>
     <sys:String x:Key="S.Welcome.CodeTitle">Completá el login en el navegador</sys:String>
     <sys:String x:Key="S.Welcome.CodeHint">Ingresá este código en la página de Microsoft:</sys:String>
+    <sys:String x:Key="S.Welcome.PasteHint">Iniciá sesión en el navegador. Después copiá el código que aparece en la barra de direcciones (después de "code=") y pegalo acá:</sys:String>
+    <sys:String x:Key="S.Welcome.Finish">Completar login</sys:String>
     <sys:String x:Key="S.Welcome.OpenBrowser">Abrir navegador</sys:String>
     <sys:String x:Key="S.Welcome.Waiting">Esperando confirmación…</sys:String>
     <sys:String x:Key="S.Welcome.Cancel">Cancelar</sys:String>

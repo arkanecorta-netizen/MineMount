@@ -256,26 +256,24 @@
                                         Orientation="Horizontal"
                                         VerticalAlignment="Center"
                                         Margin="24,0,0,0">
-                                <TextBlock Text="{Binding WindowTitle}"
+                                <TextBlock x:Name="TitleText"
+                                           Text="{Binding WindowTitle}"
                                            VerticalAlignment="Center"
                                            FontSize="12"
+                                           MaxWidth="220"
+                                           TextTrimming="CharacterEllipsis"
                                            Foreground="{DynamicResource ForegroundMutedBrush}">
                                     <TextBlock.Effect>
                                         <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#CC000000" Opacity="0.8" />
                                     </TextBlock.Effect>
                                 </TextBlock>
-                                <Border VerticalAlignment="Center"
-                                        Margin="10,0,0,0"
-                                        Background="{DynamicResource GlassCardBrush}"
-                                        BorderBrush="{DynamicResource GlassBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="9999"
-                                        Padding="9,3">
-                                    <TextBlock Text="{Binding Version}"
-                                               FontSize="10"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource ForegroundSecondaryBrush}" />
-                                </Border>
+                                <TextBlock x:Name="TitleVersionText"
+                                           Text="{Binding Version, StringFormat=v{0}}"
+                                           VerticalAlignment="Center"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Margin="10,0,0,0"
+                                           Foreground="{DynamicResource ForegroundMutedBrush}" />
                             </StackPanel>
 
                             <Grid Grid.Column="1" VerticalAlignment="Center">

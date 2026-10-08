@@ -17,7 +17,6 @@ public partial class WelcomeViewModel : ObservableObject
     private readonly IAuthService _authService;
     private readonly IMicrosoftAuthService _msAuth;
     private readonly ILogService _logService;
-    private CancellationTokenSource? _msCts;
 
     public TaskCompletionSource<GameSession?> Done { get; } = new();
 
@@ -32,6 +31,9 @@ public partial class WelcomeViewModel : ObservableObject
 
     [ObservableProperty]
     private string _authUrl = string.Empty;
+
+    [ObservableProperty]
+    private string _pastedCode = string.Empty;
 
     [ObservableProperty]
     private bool _isWaitingMicrosoft;
@@ -88,34 +90,34 @@ public partial class WelcomeViewModel : ObservableObject
     {
         if (IsBusy) return;
 
-        IsBusy = true;
         MicrosoftError = string.Empty;
+        PastedCode = string.Empty;
+        AuthUrl = _msAuth.BuildAuthorizeUrl();
         Stage = 1;
 
-        _msCts?.Cancel();
-        _msCts = new CancellationTokenSource();
-        _ = BrowserLoginAsync(_msCts.Token);
+        // Abrir el navegador automáticamente (el código queda para pegar acá)
+        OpenBrowser();
     }
 
-    private async Task BrowserLoginAsync(CancellationToken ct)
+    [RelayCommand]
+    private async Task FinishMicrosoftAsync()
     {
+        if (IsBusy || string.IsNullOrWhiteSpace(PastedCode)) return;
+
+        IsBusy = true;
         IsWaitingMicrosoft = true;
+        MicrosoftError = string.Empty;
         try
         {
-            var tokens = await _msAuth.LoginWithBrowserAsync(
-                url =>
-                {
-                    AuthUrl = url;
-                    OpenBrowser();
-                }, ct);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            var tokens = await _msAuth.ExchangeCodeAsync(PastedCode.Trim(), cts.Token);
             if (tokens == null)
             {
-                if (!ct.IsCancellationRequested)
-                    MicrosoftError = Loc.T("S.Welcome.MSError") + " (sin respuesta de Microsoft)";
+                MicrosoftError = Loc.T("S.Welcome.MSError") + " (código inválido o vencido)";
                 return;
             }
 
-            await FinishMicrosoftLoginAsync(tokens, ct);
+            await FinishMicrosoftLoginAsync(tokens, cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -172,9 +174,11 @@ public partial class WelcomeViewModel : ObservableObject
     [RelayCommand]
     private void CancelMicrosoft()
     {
-        _msCts?.Cancel();
         Stage = 0;
         MicrosoftError = string.Empty;
+        PastedCode = string.Empty;
+        IsWaitingMicrosoft = false;
+        IsBusy = false;
     }
 
     public void CloseWithoutLogin() => Done.TrySetResult(null);

@@ -178,9 +178,13 @@ public partial class AnimatedBackground : UserControl
             if (_playlist.Count == 0)
                 RebuildPlaylist(null);
             _current = _playlist.Count > 0 ? _random.Next(_playlist.Count) : 0;
-            SetImage(ImageA, _current);
-            ImageA.Opacity = 1;
-            ImageB.Opacity = 0;
+            LoadBitmapAsync(PlaylistUriAt(_current), bitmap =>
+            {
+                if (bitmap == null) return;
+                ImageA.Source = bitmap;
+                ImageA.Opacity = 1;
+                ImageB.Opacity = 0;
+            });
             _showingB = false;
             if (_animationsEnabled) StartKenBurns(ZoomA);
         }
@@ -204,9 +208,14 @@ public partial class AnimatedBackground : UserControl
         if (_playlist.Count == 0) RebuildPlaylist(null);
         _current = _playlist.Count > 0 ? index % _playlist.Count : 0;
         _showingB = false;
-        SetImage(ImageA, _current);
-        ImageB.Opacity = 0;
-        ImageA.Opacity = 1;
+        var uri = PlaylistUriAt(_current);
+        LoadBitmapAsync(uri, bitmap =>
+        {
+            if (bitmap == null) return;
+            ImageA.Source = bitmap;
+            ImageB.Opacity = 0;
+            ImageA.Opacity = 1;
+        });
         // Sin animación en modo fijo: zoom leve estático (barato, sin storyboard).
         ZoomA.ScaleX = 1.04;
         ZoomA.ScaleY = 1.04;
@@ -223,24 +232,23 @@ public partial class AnimatedBackground : UserControl
         var fadeOut = _showingB ? ImageB : ImageA;
         var zoomIn = _showingB ? ZoomA : ZoomB;
 
-        SetImage(fadeIn, next);
-        if (fadeIn.Source == null)
+        LoadBitmapAsync(PlaylistUriAt(next), bitmap =>
         {
-            // Falló la imagen: se mantiene la actual (fallback a color sólido detrás).
-            return;
-        }
+            if (bitmap == null) return; // falla: queda la actual + color sólido detrás
+            fadeIn.Source = bitmap;
 
-        var fade = new DoubleAnimation(0, 1, Crossfade)
-        {
-            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
-        };
-        var hide = new DoubleAnimation(1, 0, Crossfade)
-        {
-            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
-        };
-        fadeIn.BeginAnimation(OpacityProperty, fade);
-        fadeOut.BeginAnimation(OpacityProperty, hide);
-        StartKenBurns(zoomIn);
+            var fade = new DoubleAnimation(0, 1, Crossfade)
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
+            };
+            var hide = new DoubleAnimation(1, 0, Crossfade)
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
+            };
+            fadeIn.BeginAnimation(OpacityProperty, fade);
+            fadeOut.BeginAnimation(OpacityProperty, hide);
+            StartKenBurns(zoomIn);
+        });
 
         _showingB = !_showingB;
     }
@@ -258,25 +266,40 @@ public partial class AnimatedBackground : UserControl
             new DoubleAnimation(1.0, 1.08, duration) { EasingFunction = easing });
     }
 
-    private void SetImage(Image target, int index)
+    /// <summary>
+    /// Decodifica en un hilo de fondo (1600px para RAM/lag) y entrega el
+    /// bitmap congelado en el hilo UI. Sin esto, cambiar de fondo traba la UI.
+    /// </summary>
+    private void LoadBitmapAsync(Uri uri, Action<System.Windows.Media.ImageSource?> done)
     {
-        try
+        System.Threading.Tasks.Task.Run<System.Windows.Media.ImageSource?>(() =>
         {
-            var uri = PlaylistUriAt(index);
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.UriSource = uri;
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.DecodePixelWidth = 1920; // limita memoria/GPU en 4K
-            bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-            bitmap.EndInit();
-            if (bitmap.CanFreeze) bitmap.Freeze();
-            target.Source = bitmap;
-        }
-        catch
+            try
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = uri;
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.DecodePixelWidth = 1600;
+                bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                return bitmap;
+            }
+            catch
+            {
+                return null;
+            }
+        }).ContinueWith(t =>
         {
-            // Fallback: se deja el color sólido de fondo.
-            target.Source = null;
-        }
+            try
+            {
+                done(t.Result);
+            }
+            catch
+            {
+                // Ventana cerrada en el medio: se ignora
+            }
+        }, System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
     }
 }

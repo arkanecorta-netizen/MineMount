@@ -11,7 +11,7 @@ namespace MineMount.Views;
 
 public partial class SplashScreen : Window
 {
-    private const int MinDurationMs = 6_000;
+    private const int MinDurationMs = 2_500;
     private const int MaxDurationMs = 20_000;
 
     private readonly ISettingsService _settingsService;
@@ -243,10 +243,10 @@ public partial class SplashScreen : Window
     {
         // Paso de cierre: anima suavemente hasta que el llamador decida
         // que terminó (duración mínima global)
-        for (var i = 0; i < 10; i++)
+        for (var i = 0; i < 5; i++)
         {
-            progress.Report(i * 10);
-            await Task.Delay(100);
+            progress.Report(i * 20);
+            await Task.Delay(80);
         }
     }
 
@@ -271,9 +271,38 @@ public partial class SplashScreen : Window
     // ---------------------------------------------------------------
     private void SetStatus(string text) => StatusLabel.Text = text;
 
+    private double _displayedProgress;
+    private double _targetProgress;
+    private DispatcherTimer? _smoothTimer;
+
+    /// <summary>
+    /// Progreso fluido: la barra persigue al valor real con interpolación
+    /// en vez de saltar por escalones.
+    /// </summary>
     private void UpdateProgress(double value)
     {
-        ProgressBar.Value = value;
-        PercentLabel.Text = $"{value:F0} %";
+        _targetProgress = Math.Clamp(value, 0, 100);
+
+        if (_smoothTimer == null)
+        {
+            _smoothTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+            _smoothTimer.Tick += (_, _) =>
+            {
+                var diff = _targetProgress - _displayedProgress;
+                if (Math.Abs(diff) < 0.15)
+                {
+                    _displayedProgress = _targetProgress;
+                }
+                else
+                {
+                    _displayedProgress += diff * 0.22;
+                }
+
+                ProgressBar.Value = _displayedProgress;
+                PercentLabel.Text = $"{_displayedProgress:F0} %";
+            };
+            _smoothTimer.Start();
+            Closed += (_, _) => _smoothTimer?.Stop();
+        }
     }
 }

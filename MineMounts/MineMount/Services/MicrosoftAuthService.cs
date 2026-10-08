@@ -29,10 +29,12 @@ public sealed class MinecraftProfile
 public interface IMicrosoftAuthService
 {
     /// <summary>
-    /// Login por navegador: abre la URL (callback), espera el código en
-    /// 127.0.0.1 (TcpListener directo, sin admin) y lo canjea por tokens.
+    /// URL de login para abrir en el navegador. El redirect validado por
+    /// Microsoft para este client es oauth20_desktop.srf: tras iniciar
+    /// sesión, la barra de direcciones trae el ?code= para pegar acá.
     /// </summary>
-    Task<MsaTokens?> LoginWithBrowserAsync(Action<string> openUrl, CancellationToken ct);
+    string BuildAuthorizeUrl();
+    Task<MsaTokens?> ExchangeCodeAsync(string code, CancellationToken ct);
     Task<MsaTokens?> RefreshAsync(string refreshToken, CancellationToken ct);
     Task<(string? McToken, DateTimeOffset Expires)> LoginMinecraftAsync(MsaTokens tokens, CancellationToken ct);
     Task<MinecraftProfile?> GetProfileAsync(string mcToken, CancellationToken ct);
@@ -43,6 +45,11 @@ public class MicrosoftAuthService : IMicrosoftAuthService
     // Client público de Minecraft (el mismo que usan otros launchers).
     private const string ClientId = "00000000402b5328";
     private const string Scope = "XboxLive.signin offline_access";
+
+    // Único redirect aceptado por este client: loopback y custom URIs
+    // son rechazados (invalid_request). El código llega en la URL final
+    // (?code=...) y el usuario lo pega en el launcher.
+    private const string DesktopRedirect = "https://login.live.com/oauth20_desktop.srf";
 
     private static readonly HttpClient Http = CreateClient();
 
@@ -66,127 +73,39 @@ public class MicrosoftAuthService : IMicrosoftAuthService
         _logService = logService;
     }
 
-    public async Task<MsaTokens?> LoginWithBrowserAsync(Action<string> openUrl, CancellationToken ct)
+    public string BuildAuthorizeUrl()
     {
-        // Puerto libre en loopback (TcpListener crudo: no necesita admin
-        // como sí lo pediría HttpListener con http.sys).
-        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
-        listener.Start();
-        try
-        {
-            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
-            var redirectUri = $"http://127.0.0.1:{port}/auth";
-            var authUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize"
-                + "?client_id=" + ClientId
-                + "&response_type=code"
-                + "&redirect_uri=" + Uri.EscapeDataString(redirectUri)
-                + "&scope=" + Uri.EscapeDataString(Scope)
-                + "&prompt=select_account";
-
-            openUrl(authUrl);
-
-            var code = await WaitForCodeAsync(listener, ct);
-            if (string.IsNullOrWhiteSpace(code)) return null;
-
-            return await ExchangeCodeAsync(code, redirectUri, ct);
-        }
-        finally
-        {
-            try
-            {
-                listener.Stop();
-            }
-            catch
-            {
-                // Listener ya cerrado
-            }
-        }
+        return "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize"
+            + "?client_id=" + ClientId
+            + "&response_type=code"
+            + "&redirect_uri=" + Uri.EscapeDataString(DesktopRedirect)
+            + "&scope=" + Uri.EscapeDataString(Scope)
+            + "&prompt=select_account";
     }
 
-    private static async Task<string?> WaitForCodeAsync(
-        System.Net.Sockets.TcpListener listener, CancellationToken ct)
+    public async Task<MsaTokens?> ExchangeCodeAsync(string code, CancellationToken ct)
     {
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(TimeSpan.FromMinutes(5));
-        var token = timeoutCts.Token;
+        code = (code ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(code)) return null;
 
-        while (true)
+        // Acepta el código pelado o la URL completa (?code=...).
+        var codeIndex = code.IndexOf("code=", StringComparison.OrdinalIgnoreCase);
+        if (codeIndex >= 0)
         {
-            token.ThrowIfCancellationRequested();
-
-            var acceptTask = listener.AcceptTcpClientAsync();
-            var completed = await Task.WhenAny(acceptTask, Task.Delay(500, token));
-            if (completed != acceptTask) continue;
-
-            using var client = await acceptTask;
-            using var stream = client.GetStream();
-
-            var buffer = new byte[8192];
-            var readTask = stream.ReadAsync(buffer, 0, buffer.Length, token);
-            var got = await Task.WhenAny(readTask, Task.Delay(10000, token));
-            if (got != readTask || readTask.Result <= 0) continue;
-
-            var request = System.Text.Encoding.UTF8.GetString(buffer, 0, readTask.Result);
-            var firstLine = request.Split(new[] { "\r\n" }, StringSplitOptions.None)[0];
-            // GET /auth?code=XXX&... HTTP/1.1
-            var parts = firstLine.Split(' ');
-            var query = parts.Length >= 2 && parts[1].Contains('?')
-                ? parts[1].Substring(parts[1].IndexOf('?') + 1)
-                : string.Empty;
-
-            RespondBrowser(stream);
-
-            string? code = null;
-            string? error = null;
-            foreach (var pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
-            {
-                var kv = pair.Split('=', 2);
-                if (kv.Length != 2) continue;
-                var value = Uri.UnescapeDataString(kv[1]);
-                if (kv[0] == "code") code = value;
-                else if (kv[0] == "error") error = value;
-            }
-
-            if (!string.IsNullOrWhiteSpace(error))
-            {
-                if (error == "access_denied")
-                    throw new InvalidOperationException("Denegaste el acceso en el navegador. Probá de nuevo.");
-                throw new InvalidOperationException($"Microsoft devolvió '{error}'. Probá de nuevo.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(code)) return code;
-            // Petición ajena (favicon, etc.): seguir esperando
+            code = code.Substring(codeIndex + 5);
+            var amp = code.IndexOf('&');
+            if (amp >= 0) code = code.Substring(0, amp);
+            code = Uri.UnescapeDataString(code.Trim());
         }
-    }
 
-    private static void RespondBrowser(System.Net.Sockets.NetworkStream stream)
-    {
-        try
-        {
-            var html = "<html><body style='background:#0B0B0F;color:#fff;font-family:sans-serif'>" +
-                "<h2>Listo, volvé a MineMount.</h2><p>Podés cerrar esta pestaña.</p></body></html>";
-            var body = System.Text.Encoding.UTF8.GetBytes(html);
-            var header = System.Text.Encoding.ASCII.GetBytes(
-                "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n" +
-                $"Content-Length: {body.Length}\r\nConnection: close\r\n\r\n");
-            stream.Write(header, 0, header.Length);
-            stream.Write(body, 0, body.Length);
-            stream.Flush();
-        }
-        catch
-        {
-            // El navegador ya se fue: no importa
-        }
-    }
+        if (string.IsNullOrWhiteSpace(code)) return null;
 
-    private async Task<MsaTokens?> ExchangeCodeAsync(string code, string redirectUri, CancellationToken ct)
-    {
         var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
             ["client_id"] = ClientId,
             ["code"] = code,
-            ["redirect_uri"] = redirectUri
+            ["redirect_uri"] = DesktopRedirect
         });
 
         using var resp = await Http.PostAsync(

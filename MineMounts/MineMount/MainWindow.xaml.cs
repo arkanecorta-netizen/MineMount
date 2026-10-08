@@ -168,6 +168,10 @@ public partial class MainWindow : Window
         var w = ActualWidth;
         if (_viewModel != null) _viewModel.PromosCompact = w < 1100;
 
+        // Botones de ventana siempre visibles: se compacta el título primero
+        TitleVersionText.Visibility = w < 1050 ? Visibility.Collapsed : Visibility.Visible;
+        TitleText.MaxWidth = w < 1050 ? 140 : 220;
+
         if (w < 1020)
         {
             VersionBox.Width = 150;

@@ -120,7 +120,9 @@ public class CategoryToBrushConverter : IValueConverter
             "evento" => Color.FromRgb(0xF9, 0xA8, 0xD4),        // rosa claro
             _ => Color.FromRgb(0xE4, 0xE4, 0xE7)               // gris claro
         };
-        return new SolidColorBrush(color);
+        var brush = new SolidColorBrush(color);
+        if (brush.CanFreeze) brush.Freeze();
+        return brush;
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

@@ -211,15 +211,38 @@ public class SeriesInfo
     public string Banner => Definition.Banner;
     public bool IsAvailable => Definition.Available;
 
-    public string StatusText => Status switch
+    public string StatusText
     {
-        SeriesStatus.ComingSoon => Services.Loc.T("Status.ComingSoon"),
-        SeriesStatus.NotInstalled => Services.Loc.T("Status.NotInstalled"),
-        SeriesStatus.Installed => Services.Loc.T("Status.Installed"),
-        SeriesStatus.UpdateAvailable => Services.Loc.T("Status.UpdateAvailable"),
-        SeriesStatus.MissingFiles => Services.Loc.T("Status.MissingFiles"),
-        _ => string.Empty
-    };
+        get
+        {
+            var key = Status switch
+            {
+                SeriesStatus.ComingSoon => "S.Status.ComingSoon",
+                SeriesStatus.NotInstalled => "S.Status.NotInstalled",
+                SeriesStatus.Installed => "S.Status.Installed",
+                SeriesStatus.UpdateAvailable => "S.Status.UpdateAvailable",
+                SeriesStatus.MissingFiles => "S.Status.MissingFiles",
+                _ => string.Empty
+            };
+            if (string.IsNullOrEmpty(key)) return string.Empty;
+
+            var text = Services.Loc.T(key);
+            // Fallback en español: nunca mostrar una clave cruda en la UI
+            if (text.StartsWith("S.", StringComparison.Ordinal))
+            {
+                return Status switch
+                {
+                    SeriesStatus.ComingSoon => "Próximamente",
+                    SeriesStatus.NotInstalled => "NO INSTALADO",
+                    SeriesStatus.Installed => "INSTALADA",
+                    SeriesStatus.UpdateAvailable => "ACTUALIZACIÓN DISPONIBLE",
+                    SeriesStatus.MissingFiles => "FALTAN ARCHIVOS",
+                    _ => string.Empty
+                };
+            }
+            return text;
+        }
+    }
 
     public bool IsInstalled => Status == SeriesStatus.Installed
         || Status == SeriesStatus.UpdateAvailable

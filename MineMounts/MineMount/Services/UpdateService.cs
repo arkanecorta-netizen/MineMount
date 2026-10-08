@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -40,14 +41,16 @@ public class UpdateService : IUpdateService
     };
 
     private readonly ILogService _log;
+    private readonly INotificationService _notifications;
     private readonly string _appDataDir;
 
     private Uri? _packageUrl;
     private string? _expectedSha256;
 
-    public UpdateService(ILogService logService)
+    public UpdateService(ILogService logService, INotificationService notifications)
     {
         _log = logService;
+        _notifications = notifications;
         _appDataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "MineMount");
@@ -382,12 +385,23 @@ public class UpdateService : IUpdateService
             var pid = Environment.ProcessId;
             var scriptPath = Path.Combine(StageDir, "apply.cmd");
 
-            var script = BuildApplyScript(pid, newExe, appDir, StageDir);
+            // Si la carpeta no es escribible (Program Files), el script se
+            // auto-eleva SOLO en ese caso. Nunca se muestra una consola.
+            var needsElevation = !IsDirectoryWritable(appDir);
+            if (needsElevation)
+            {
+                _notifications.NotifyWarning(
+                    "Permiso necesario",
+                    "La actualización necesita permiso de administrador (solo esta vez).");
+            }
+
+            var script = BuildApplyScript(pid, newExe, appDir, StageDir, needsElevation);
             File.WriteAllText(scriptPath, script);
 
             Process.Start(new ProcessStartInfo
             {
-                FileName = scriptPath,
+                FileName = Path.Combine(Environment.SystemDirectory, "cmd.exe"),
+                Arguments = $"/c \"\"{scriptPath}\"\"",
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden,
@@ -501,21 +515,32 @@ public class UpdateService : IUpdateService
         }
     }
 
-    private static string BuildApplyScript(int pid, string newExe, string appDir, string stageDir)
+    private static string BuildApplyScript(int pid, string newExe, string appDir, string stageDir, bool needsElevation)
     {
-        // Script updater:
+        // Script updater, siempre oculto (nunca muestra consola):
         //  1. Espera a que MineMount.exe (pid) termine
         //  2. Copia el nuevo exe al directorio de la app
-        //  3. Si no tiene permisos (Program Files), se relanza elevado (UAC)
+        //  3. Solo si no hay permiso (Program Files) se relanza elevado,
+        //     también oculto (el UAC lo pide Windows, no se puede evitar ahí)
         //  4. Reinicia MineMount y limpia el staging
-        var lines = new[]
+        var lines = new List<string>
         {
             "@echo off",
             "setlocal",
             $"set \"PID={pid}\"",
             $"set \"NEW={newExe}\"",
             $"set \"APPDIR={appDir}\"",
-            $"set \"STAGE={stageDir}\"",
+            $"set \"STAGE={stageDir}\""
+        };
+
+        if (needsElevation)
+        {
+            lines.Add("powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command \"Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '%~f0' -Verb RunAs -WindowStyle Hidden\"");
+            lines.Add("exit /b 0");
+        }
+
+        lines.AddRange(new[]
+        {
             ":wait",
             "tasklist /FI \"PID eq %PID%\" 2>nul | find \"%PID%\" >nul",
             "if not errorlevel 1 (",
@@ -524,13 +549,29 @@ public class UpdateService : IUpdateService
             ")",
             "copy /Y \"%NEW%\" \"%APPDIR%MineMount.exe\" >nul 2>&1",
             "if errorlevel 1 (",
-            "  powershell -NoProfile -ExecutionPolicy Bypass -Command \"Start-Process -FilePath '%~f0' -Verb RunAs\"",
+            "  powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command \"Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '%~f0' -Verb RunAs -WindowStyle Hidden\"",
             "  exit /b 0",
             ")",
             "start \"\" \"%APPDIR%MineMount.exe\"",
             $"powershell -NoProfile -WindowStyle Hidden -Command \"Start-Sleep 5; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '{stageDir}'\""
-        };
+        });
 
         return string.Join("\r\n", lines) + "\r\n";
+    }
+
+    /// <summary>Prueba de escritura real (sin elevar): archivo temporal.</summary>
+    private static bool IsDirectoryWritable(string dir)
+    {
+        try
+        {
+            var probe = Path.Combine(dir, ".mm-write-test");
+            File.WriteAllText(probe, "ok");
+            File.Delete(probe);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

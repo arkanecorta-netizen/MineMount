@@ -95,6 +95,8 @@
     <sys:String x:Key="S.Welcome.Continue">Continue</sys:String>
     <sys:String x:Key="S.Welcome.CodeTitle">Finish login in the browser</sys:String>
     <sys:String x:Key="S.Welcome.CodeHint">Enter this code on the Microsoft page:</sys:String>
+    <sys:String x:Key="S.Welcome.PasteHint">Sign in using the browser. Then copy the code from the address bar (after "code=") and paste it here:</sys:String>
+    <sys:String x:Key="S.Welcome.Finish">Finish login</sys:String>
     <sys:String x:Key="S.Welcome.OpenBrowser">Open browser</sys:String>
     <sys:String x:Key="S.Welcome.Waiting">Waiting for confirmation…</sys:String>
     <sys:String x:Key="S.Welcome.Cancel">Cancel</sys:String>

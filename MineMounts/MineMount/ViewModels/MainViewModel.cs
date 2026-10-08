@@ -538,7 +538,7 @@ public partial class MainViewModel : ObservableObject
             SeriesStatus.NotInstalled => Loc.T("S.Play.Head.Available"),
             SeriesStatus.UpdateAvailable => Loc.T("S.Play.Head.UpdateReady"),
             SeriesStatus.MissingFiles => Loc.T("S.Play.Head.Missing"),
-            SeriesStatus.ComingSoon => Loc.T("Status.ComingSoon"),
+            SeriesStatus.ComingSoon => Loc.T("S.Status.ComingSoon"),
             _ => s.StatusText
         };
 
