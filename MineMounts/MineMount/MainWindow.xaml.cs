@@ -301,6 +301,15 @@ public partial class MainWindow : Window
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // Los clicks en botones (minimizar/maximizar/cerrar) no arrastran:
+        // si el origen está dentro de un botón, se deja el evento al botón.
+        DependencyObject? node = e.OriginalSource as DependencyObject;
+        while (node != null)
+        {
+            if (node is System.Windows.Controls.Primitives.ButtonBase) return;
+            node = VisualTreeHelper.GetParent(node);
+        }
+
         if (e.ClickCount == 2)
         {
             if (WindowState == WindowState.Maximized)

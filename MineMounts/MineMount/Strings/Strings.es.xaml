@@ -80,6 +80,7 @@
     <sys:String x:Key="S.Series.MenuRepair">Reparar instalación</sys:String>
     <sys:String x:Key="S.Series.MenuOpen">Abrir carpeta</sys:String>
     <sys:String x:Key="S.Series.MenuUninstall">Desinstalar</sys:String>
+    <sys:String x:Key="S.Series.More">Más opciones</sys:String>
     <sys:String x:Key="S.Series.UninstallTitle">Desinstalar serie</sys:String>
     <sys:String x:Key="S.Series.UninstallMsg">¿Desinstalar {0}? Se borran sus archivos (el catálogo queda intacto).</sys:String>
     <sys:String x:Key="S.Series.Uninstalled">{0} desinstalada</sys:String>

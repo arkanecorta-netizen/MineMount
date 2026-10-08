@@ -318,7 +318,8 @@
                                                     Style="{StaticResource Button.Secondary}"
                                                     Height="40" Width="48" Margin="8,0,0,0"
                                                     FontSize="18" FontWeight="Bold"
-                                                    AutomationProperties.Name="Más opciones" />
+                                                    ToolTip="{DynamicResource S.Series.More}"
+                                                    AutomationProperties.Name="{DynamicResource S.Series.More}" />
                                         </Grid>
 
                                         <!-- Progreso de la tarjeta -->

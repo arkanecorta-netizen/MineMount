@@ -73,6 +73,7 @@
     <sys:String x:Key="S.Series.MenuRepair">Repair installation</sys:String>
     <sys:String x:Key="S.Series.MenuOpen">Open folder</sys:String>
     <sys:String x:Key="S.Series.MenuUninstall">Uninstall</sys:String>
+    <sys:String x:Key="S.Series.More">More options</sys:String>
     <sys:String x:Key="S.Series.UninstallTitle">Uninstall series</sys:String>
     <sys:String x:Key="S.Series.UninstallMsg">Uninstall {0}? Its files will be deleted (catalog untouched).</sys:String>
     <sys:String x:Key="S.Series.Uninstalled">{0} uninstalled</sys:String>

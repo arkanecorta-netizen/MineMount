@@ -2,16 +2,16 @@
   {
     "id": "NSE6",
     "name": "NSE6",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "La serie principal de MineMount: mods, configuraciones, recursos y archivos necesarios para jugar.",
     "logo": "https://raw.githubusercontent.com/arkanecorta-netizen/MineMount/main/MineMounts/MineMount/Assets/Series/NSE6/logo.png",
     "banner": "https://raw.githubusercontent.com/arkanecorta-netizen/MineMount/main/MineMounts/MineMount/Assets/Series/NSE6/banner.png",
     "available": true,
     "minecraftVersion": "1.20.1",
     "loader": "Forge",
-    "changelog": "Mods actualizados, configuración optimizada y recursos de la temporada.",
+    "changelog": "Mods reales de la serie para probar el arranque: JEI, Jade, Supplementaries, WorldEdit, Cloth Config y los mods propios de NSE6 (generador, mundo y luces).",
     "resources": {
-      "tag": "nse6-v1.0.0",
+      "tag": "nse6-v1.0.1",
       "asset": "NSE6-Resources.zip"
     }
   }
