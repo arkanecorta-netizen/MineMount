@@ -303,22 +303,6 @@
                     </Button.Style>
                 </Button>
 
-                <Button Content="JUGAR"
-                        Command="{Binding PlayCommand}"
-                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
-                            <Setter Property="Padding" Value="24,10" />
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsInstalled}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-
                 <Button Content="CANCELAR"
                         Command="{Binding CancelOperationCommand}"
                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">

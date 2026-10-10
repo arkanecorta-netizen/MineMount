@@ -446,8 +446,8 @@
                                 </Button>
                                 <TextBlock Text="{Binding PlayStatusDetail}"
                                            Margin="2,8,0,0"
-                                           MaxWidth="220"
-                                           TextWrapping="NoWrap"
+                                           MaxWidth="320"
+                                           TextWrapping="Wrap"
                                            TextTrimming="CharacterEllipsis">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock" BasedOn="{StaticResource TextBlock.Caption}">
@@ -455,6 +455,8 @@
                                                 <DataTrigger Binding="{Binding PlayStatusIsError}" Value="True">
                                                     <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
                                                     <Setter Property="FontWeight" Value="SemiBold" />
+                                                    <Setter Property="TextWrapping" Value="Wrap" />
+                                                    <Setter Property="MaxWidth" Value="320" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>

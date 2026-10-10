@@ -232,87 +232,87 @@
                                             </StackPanel>
                                         </Border>
 
-                                        <!-- Botones contextuales -->
-                                        <Grid Margin="0,12,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
-                                                    Command="{Binding DataContext.PlayCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}">
-                                                <Button.Style>
-                                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.Installed}">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                                <Setter Property="Content" Value="{DynamicResource S.Play}" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Button.Style>
-                                            </Button>
-                                            <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
-                                                    Command="{Binding DataContext.InstallCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}">
-                                                <Button.Style>
-                                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.NotInstalled}">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                                <Setter Property="Content" Value="{DynamicResource S.Install}" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Button.Style>
-                                            </Button>
-                                            <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
-                                                    Command="{Binding DataContext.UpdateCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}">
-                                                <Button.Style>
-                                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.UpdateAvailable}">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                                <Setter Property="Content" Value="{DynamicResource S.Update}" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Button.Style>
-                                            </Button>
-                                            <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
-                                                    Command="{Binding DataContext.RepairCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}">
-                                                <Button.Style>
-                                                    <Style TargetType="Button" BasedOn="{StaticResource Button.Secondary}">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.MissingFiles}">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                                <Setter Property="Content" Value="{DynamicResource S.Repair}" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Button.Style>
-                                            </Button>
-                                            <TextBlock Grid.Column="0"
-                                                       Text="{DynamicResource S.ComingSoon}"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       Foreground="#FFD1D5DB" FontWeight="SemiBold">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.ComingSoon}">
-                                                                <Setter Property="Visibility" Value="Visible" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
+<!-- Botones contextuales -->
+                                         <Grid Margin="0,12,0,0">
+                                             <Grid.ColumnDefinitions>
+                                                 <ColumnDefinition Width="*" />
+                                                 <ColumnDefinition Width="Auto" />
+                                             </Grid.ColumnDefinitions>
+                                             <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
+                                                     Command="{Binding DataContext.PlayCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                     CommandParameter="{Binding}">
+                                                 <Button.Style>
+                                                     <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                                         <Setter Property="Visibility" Value="Collapsed" />
+                                                         <Style.Triggers>
+                                                             <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.Installed}">
+                                                                 <!-- Installed: PlayBar at bottom handles "JUGAR" -->
+                                                                 <Setter Property="Visibility" Value="Collapsed" />
+                                                             </DataTrigger>
+                                                         </Style.Triggers>
+                                                     </Style>
+                                                 </Button.Style>
+                                             </Button>
+                                             <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
+                                                     Command="{Binding DataContext.InstallCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                     CommandParameter="{Binding}">
+                                                 <Button.Style>
+                                                     <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                                         <Setter Property="Visibility" Value="Collapsed" />
+                                                         <Style.Triggers>
+                                                             <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.NotInstalled}">
+                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                                 <Setter Property="Content" Value="{DynamicResource S.Install}" />
+                                                             </DataTrigger>
+                                                         </Style.Triggers>
+                                                     </Style>
+                                                 </Button.Style>
+                                             </Button>
+                                             <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
+                                                     Command="{Binding DataContext.UpdateCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                     CommandParameter="{Binding}">
+                                                 <Button.Style>
+                                                     <Style TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+                                                         <Setter Property="Visibility" Value="Collapsed" />
+                                                         <Style.Triggers>
+                                                             <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.UpdateAvailable}">
+                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                                 <Setter Property="Content" Value="{DynamicResource S.Update}" />
+                                                             </DataTrigger>
+                                                         </Style.Triggers>
+                                                     </Style>
+                                                 </Button.Style>
+                                             </Button>
+                                             <Button Grid.Column="0" Height="40" HorizontalAlignment="Stretch"
+                                                     Command="{Binding DataContext.RepairCardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                     CommandParameter="{Binding}">
+                                                 <Button.Style>
+                                                     <Style TargetType="Button" BasedOn="{StaticResource Button.Secondary}">
+                                                         <Setter Property="Visibility" Value="Collapsed" />
+                                                         <Style.Triggers>
+                                                             <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.MissingFiles}">
+                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                                 <Setter Property="Content" Value="{DynamicResource S.Repair}" />
+                                                             </DataTrigger>
+                                                         </Style.Triggers>
+                                                     </Style>
+                                                 </Button.Style>
+                                             </Button>
+                                             <TextBlock Grid.Column="0"
+                                                        Text="{DynamicResource S.ComingSoon}"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                        Foreground="#FFD1D5DB" FontWeight="SemiBold">
+                                                 <TextBlock.Style>
+                                                     <Style TargetType="TextBlock">
+                                                         <Setter Property="Visibility" Value="Collapsed" />
+                                                         <Style.Triggers>
+                                                             <DataTrigger Binding="{Binding Info.Status}" Value="{x:Static models:SeriesStatus.ComingSoon}">
+                                                                 <Setter Property="Visibility" Value="Visible" />
+                                                             </DataTrigger>
+                                                         </Style.Triggers>
+                                                     </Style>
+                                                 </TextBlock.Style>
+                                             </TextBlock>
                                             <Button Grid.Column="1" Content="⋯"
                                                     Click="More_Click" Tag="{Binding}"
                                                     Style="{StaticResource Button.Secondary}"
