@@ -72,10 +72,22 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Published successfully to Publish\" -ForegroundColor Green
 Write-Host ""
 
+# Read app version from csproj (single source of truth)
+$appVersion = "1.0.0"
+try {
+    [xml]$csproj = Get-Content "MineMount\MineMount.csproj"
+    $v = $csproj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+    if ($v) { $appVersion = $v.Trim() }
+} catch {
+    Write-Host "WARNING: Could not read version from csproj, using $appVersion." -ForegroundColor Yellow
+}
+Write-Host "App version: $appVersion" -ForegroundColor Green
+Write-Host ""
+
 # Step 4: Generate Installer
 if ($hasInno) {
     Write-Host "Step 4: Generating installer..." -ForegroundColor Yellow
-    & $innoPath "Installer\MineMount.iss"
+    & $innoPath "Installer\MineMount.iss" "/DMyAppVersion=$appVersion"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: Installer generation failed." -ForegroundColor Red
         exit 1
@@ -87,6 +99,20 @@ if ($hasInno) {
     Write-Host ""
 }
 
+# Step 5: Update package for the in-app updater (UpdateService expects MineMount-Update.zip
+# containing MineMount.exe at the zip root, otherwise CheckForUpdatesAsync reports no update)
+Write-Host "Step 5: Building update package..." -ForegroundColor Yellow
+$updateZip = "Output\MineMount-Update.zip"
+if (Test-Path $updateZip) { Remove-Item $updateZip -Force }
+$publishExe = "Publish\MineMount.exe"
+if (-not (Test-Path $publishExe)) {
+    Write-Host "ERROR: $publishExe not found, cannot build update package." -ForegroundColor Red
+    exit 1
+}
+Compress-Archive -Path $publishExe -DestinationPath $updateZip -CompressionLevel Optimal
+Write-Host "Update package created: $updateZip" -ForegroundColor Green
+Write-Host ""
+
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Build Complete!" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
@@ -96,4 +122,7 @@ Write-Host "  - MineMount.exe: Publish\MineMount.exe" -ForegroundColor Gray
 if ($hasInno) {
     Write-Host "  - Installer: Output\MineMount-Setup.exe" -ForegroundColor Gray
 }
+Write-Host "  - Update package: Output\MineMount-Update.zip" -ForegroundColor Gray
+Write-Host ""
+Write-Host "Release checklist (GitHub): upload MineMount-Setup.exe, MineMount.exe AND MineMount-Update.zip" -ForegroundColor Yellow
 Write-Host ""
