@@ -20,6 +20,24 @@ public class SeriesLaunchConfig
     public int MinRAM { get; set; } = 2048;
     public int MaxRAM { get; set; } = 4096;
     public string Classpath { get; set; } = string.Empty;
+    /// <summary>
+    /// Lanzamiento moderno (Forge &gt;= 1.17). Si es false se usa el
+    /// launchwrapper clásico (series vanilla/antiguas).
+    /// </summary>
+    public bool UseBootstrap { get; set; }
+    /// <summary>
+    /// Argumentos JVM del version.json de Forge ya con placeholders
+    /// resueltos (-p module-path, --add-modules, --add-opens...).
+    /// </summary>
+    public string ForgeJvmArgs { get; set; } = string.Empty;
+    /// <summary>
+    /// Argumentos de juego del version.json de Forge (--launchTarget, --fml.*).
+    /// </summary>
+    public string ForgeGameArgs { get; set; } = string.Empty;
+    /// <summary>
+    /// Id de versión de Forge (p.ej. 1.20.1-forge-47.2.0).
+    /// </summary>
+    public string ForgeVersionId { get; set; } = string.Empty;
     public string NativesDir { get; set; } = string.Empty;
     public string GameDir { get; set; } = string.Empty;
     public string AssetsDir { get; set; } = string.Empty;
@@ -511,8 +529,8 @@ public class GameLauncherService : IGameLauncherService
                 await _forgeInstall.InstallForgeAsync(mcVersion, progress, CancellationToken.None);
             }
 
-            // Java (Forge 1.20.1 necesita Java 17)
-            var java = await FindJavaAsync(17);
+            // Java según la versión de MC (<=1.16 → 8 · 1.17–1.20.4 → 17 · >=1.20.5 → 21)
+            var java = await FindJavaAsync(GetRequiredJava(mcVersion));
             if (java == null)
             {
                 result.Message = "Java 17 no fue encontrado. Instalá Java 17 o configurá su ruta.";
@@ -647,14 +665,39 @@ public class GameLauncherService : IGameLauncherService
 
         var session = _authService.CurrentSession;
 
-        // Classpath: client jar + libraries + forge universal jar
+        // Classpath vanilla: client jar + libraries (con rules por SO).
         var clientJar = await _minecraftInstall.GetClientJarPathAsync(mcVersion);
         var libraries = await _minecraftInstall.GetLibraryPathsAsync(mcVersion);
-        var forgeJar = await _forgeInstall.GetForgeJarPathAsync(mcVersion);
 
-        var classpathParts = new List<string> { clientJar };
-        classpathParts.AddRange(libraries);
-        classpathParts.Add(forgeJar);
+        // Lanzamiento moderno (Forge >= 1.17, p.ej. 1.20.1): BootstrapLauncher
+        // con module-path. Requiere el version.json de Forge; si no hay,
+        // se usa el launchwrapper clásico.
+        var forgeData = await _forgeInstall.TryGetForgeLaunchDataAsync(info.InstallPath, mcVersion);
+        var useBootstrap = forgeData != null
+            && File.Exists(forgeData.ForgeJar)
+            && forgeData.JvmArgs.Count > 0;
+        if (useBootstrap)
+        {
+            await _forgeInstall.EnsureForgeLibrariesAsync(forgeData!, null, CancellationToken.None);
+        }
+
+        var classpathParts = new List<string>();
+        if (useBootstrap)
+        {
+            // OJO: el client jar vanilla NO va al classpath: el jar de Forge
+            // ya provee el módulo minecraft y ambos contienen los mismos
+            // paquetes (split-package → ResolutionException).
+            classpathParts.AddRange(libraries);
+            classpathParts.AddRange(forgeData!.ClasspathLibraries.Where(File.Exists));
+            classpathParts.Add(forgeData.ForgeJar);
+        }
+        else
+        {
+            var forgeJar = await _forgeInstall.GetForgeJarPathAsync(mcVersion);
+            classpathParts.Add(clientJar);
+            classpathParts.AddRange(libraries);
+            classpathParts.Add(forgeJar);
+        }
 
         var nativesDir = await _minecraftInstall.GetNativesDirAsync(mcVersion);
         var assetsDir = await _minecraftInstall.GetAssetsDirAsync(mcVersion);
@@ -689,6 +732,10 @@ public class GameLauncherService : IGameLauncherService
             MinRAM = Math.Min(2048, maxRAM),
             MaxRAM = maxRAM,
             Classpath = string.Join(';', classpathParts),
+            UseBootstrap = useBootstrap,
+            ForgeJvmArgs = useBootstrap ? string.Join(' ', forgeData!.JvmArgs.Select(QuoteIfNeeded)) : string.Empty,
+            ForgeGameArgs = useBootstrap ? string.Join(' ', forgeData!.GameArgs.Select(QuoteIfNeeded)) : string.Empty,
+            ForgeVersionId = useBootstrap ? forgeData!.VersionId : string.Empty,
             NativesDir = nativesDir,
             GameDir = info.InstallPath,
             AssetsDir = assetsDir,
@@ -725,26 +772,45 @@ public class GameLauncherService : IGameLauncherService
         return (0, 0);
     }
 
+    private static string QuoteIfNeeded(string value)
+        => string.IsNullOrEmpty(value) ? value
+            : value.Contains(' ') || value.Contains('"')
+                ? "\"" + value.Replace("\"", "\\\"") + "\""
+                : value;
+
     private static string BuildArguments(SeriesLaunchConfig config)
     {
-        // Forge 1.20.1 usa launchwrapper con FMLTweaker.
-        // El classpath y los args se construyen desde la configuración.
+        var jvm = $"-Xms{config.MinRAM}M -Xmx{config.MaxRAM}M";
+        if (!string.IsNullOrWhiteSpace(config.JvmArgs)) jvm += " " + config.JvmArgs;
+
         var gameArgs = $"--username {config.Username} " +
-                $"--version {config.MinecraftVersion}-forge " +
+                $"--version {(config.UseBootstrap && !string.IsNullOrEmpty(config.ForgeVersionId) ? config.ForgeVersionId : config.MinecraftVersion + "-forge")} " +
                 $"--gameDir \"{config.GameDir}\" " +
                 $"--assetsDir \"{config.AssetsDir}\" " +
                 $"--assetIndex {config.AssetIndex} " +
                 $"--uuid {config.UUID} " +
                 $"--accessToken {config.AccessToken} " +
-                $"--userType {config.UserType} " +
-                "--tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker";
+                $"--userType {config.UserType}";
 
         if (config.Fullscreen) gameArgs += " --fullscreen";
         if (config.Width > 0 && config.Height > 0)
             gameArgs += $" --width {config.Width} --height {config.Height}";
 
-        var jvm = $"-Xms{config.MinRAM}M -Xmx{config.MaxRAM}M";
-        if (!string.IsNullOrWhiteSpace(config.JvmArgs)) jvm += " " + config.JvmArgs;
+        if (config.UseBootstrap)
+        {
+            // Forge >= 1.17 (probado con 1.20.1-47.2.0): el version.json de
+            // Forge ya trae -p (module-path), --add-modules y --add-opens.
+            // El client jar vanilla queda FUERA del classpath (split-package).
+            return $"{jvm} " +
+                    $"-Djava.library.path=\"{config.NativesDir}\" " +
+                    $"{config.ForgeJvmArgs} " +
+                    $"-cp \"{config.Classpath}\" " +
+                    "cpw.mods.bootstraplauncher.BootstrapLauncher " +
+                    gameArgs + " " + config.ForgeGameArgs;
+        }
+
+        // Clásico (vanilla / Forge <= 1.16 con launchwrapper).
+        gameArgs += " --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker";
 
         return $"{jvm} " +
                 $"-Djava.library.path=\"{config.NativesDir}\" " +

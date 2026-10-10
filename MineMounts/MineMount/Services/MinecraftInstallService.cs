@@ -174,10 +174,11 @@ public class MinecraftInstallService : IMinecraftInstallService
         var clientJar = Path.Combine(dir, "client.jar");
         if (!File.Exists(clientJar)) return false;
 
-        // Libraries
+        // Libraries (solo las permitidas por rules en este SO)
         var librariesDir = Path.Combine(dir, "libraries");
         foreach (var lib in version.Libraries)
         {
+            if (!lib.IsAllowedOnCurrentOs()) continue;
             var artifact = lib.Downloads?.Artifact;
             if (artifact == null) continue;
 
@@ -249,8 +250,10 @@ public class MinecraftInstallService : IMinecraftInstallService
         }
         progress?.Report(5);
 
-        // 2. Libraries (5% → 40%)
-        var libs = version.Libraries.Where(l => l.Downloads?.Artifact != null).ToList();
+        // 2. Libraries (5% → 40%, solo las permitidas por rules en este SO)
+        var libs = version.Libraries
+            .Where(l => l.IsAllowedOnCurrentOs() && l.Downloads?.Artifact != null)
+            .ToList();
         var libDone = 0;
         foreach (var lib in libs)
         {
@@ -270,7 +273,7 @@ public class MinecraftInstallService : IMinecraftInstallService
 
         // 3. Natives (40% → 50%)
         var nativeLibs = version.Libraries
-            .Where(l => l.Natives != null && l.Downloads?.Classifiers != null)
+            .Where(l => l.IsAllowedOnCurrentOs() && l.Natives != null && l.Downloads?.Classifiers != null)
             .ToList();
         var nativeDone = 0;
         foreach (var lib in nativeLibs)
@@ -501,6 +504,7 @@ public class MinecraftInstallService : IMinecraftInstallService
 
         foreach (var lib in version.Libraries)
         {
+            if (!lib.IsAllowedOnCurrentOs()) continue;
             var artifact = lib.Downloads?.Artifact;
             if (artifact == null) continue;
 
@@ -559,6 +563,41 @@ public class VersionLibrary
     public string Name { get; set; } = string.Empty;
     public VersionLibraryDownloads Downloads { get; set; } = new();
     public Dictionary<string, string>? Natives { get; set; }
+    public List<VersionRule>? Rules { get; set; }
+
+    /// <summary>
+    /// Reglas "rules" del version.json de Mojang. Sin reglas → permitida.
+    /// Con reglas → la última regla cuyo filtro OS coincida decide.
+    /// </summary>
+    public bool IsAllowedOnCurrentOs()
+    {
+        if (Rules == null || Rules.Count == 0) return true;
+
+        var allow = false;
+        foreach (var rule in Rules)
+        {
+            var os = rule.Os?.Name?.Trim().ToLowerInvariant();
+            var matches = string.IsNullOrEmpty(os)
+                || os == "windows"
+                || (os == "windows-64" && Environment.Is64BitOperatingSystem)
+                || (os == "windows-32" && !Environment.Is64BitOperatingSystem);
+            if (!matches) continue;
+
+            allow = string.Equals(rule.Action, "allow", StringComparison.OrdinalIgnoreCase);
+        }
+        return allow;
+    }
+}
+
+public class VersionRule
+{
+    public string Action { get; set; } = string.Empty;
+    public VersionRuleOs? Os { get; set; }
+}
+
+public class VersionRuleOs
+{
+    public string? Name { get; set; }
 }
 
 public class VersionLibraryDownloads
