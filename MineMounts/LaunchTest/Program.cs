@@ -20,7 +20,8 @@ public static class Program
         var notifications = new NotificationService();
         var mcInstall = new MinecraftInstallService(log, settings);
         var forgeInstall = new ForgeInstallService(log);
-        var launcher = new GameLauncherService(series, storage, settings, log, notifications, mcInstall, forgeInstall, auth);
+        var javaDl = new JavaDownloaderService(log);
+        var launcher = new GameLauncherService(series, storage, settings, log, notifications, mcInstall, forgeInstall, javaDl, auth);
 
         Console.WriteLine($"=== Series disponibles ===");
         try

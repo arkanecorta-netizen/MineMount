@@ -548,7 +548,13 @@ public class UpdateService : IUpdateService
     }
 
     private static string NormalizeVersion(string tag)
-        => tag.Trim().TrimStart('v', 'V');
+    {
+        // Acepta tags como "v1.1.16", "1.1.16b", "1.1.16-beta": conserva solo
+        // la parte numérica inicial para que Version.TryParse no falle.
+        var t = tag.Trim().TrimStart('v', 'V');
+        var m = System.Text.RegularExpressions.Regex.Match(t, @"^\d+(\.\d+){0,3}");
+        return m.Success ? m.Value : t;
+    }
 
     private static bool IsNewer(string candidate, string current)
     {

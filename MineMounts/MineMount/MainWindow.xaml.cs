@@ -22,6 +22,19 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+        // El splash se muestra antes y WPF deja como MainWindow a la
+        // primera ventana mostrada: reclamarla acá para que Minimizar /
+        // Maximizar / Minimizar-al-jugar actúen sobre ESTA ventana.
+        // (Si no, esos botones operan sobre el splash ya cerrado.)
+        try
+        {
+            if (Application.Current != null)
+                Application.Current.MainWindow = this;
+        }
+        catch
+        {
+            // Sin dispatcher: los comandos igual funcionan por referencia directa.
+        }
         _viewModel = viewModel;
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
         StateChanged += OnStateChanged;

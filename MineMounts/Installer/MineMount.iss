@@ -56,5 +56,9 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
+; NOTA: NO se borra {userappdata}\MineMount al desinstalar.
+; Ahí viven los datos del usuario (series, mods, mundos, cuentas, Java,
+; Minecraft/Forge descargados). Borrarlos es pérdida de datos.
+; Solo se eliminan temporales del updater si quedaron huérfanos.
 [UninstallDelete]
-Type: filesandordirs; Name: "{userappdata}\MineMount"
+Type: filesandordirs; Name: "{userappdata}\MineMount\updates\stage"

@@ -155,6 +155,37 @@ public class ForgeInstallService : IForgeInstallService
     private async Task RunForgeInstallerAsync(string mcVersion, string universalJar, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         progress?.Report(90);
+
+        // OJO: el universal jar NO es ejecutable (sin Main-Class). Hay que
+        // descargar y correr el installer jar oficial.
+        var installerPath = Path.Combine(_forgeDir, $"forge-{mcVersion}-{ForgeVersion}-installer.jar");
+        if (!File.Exists(installerPath) || new FileInfo(installerPath).Length < 1024 * 1024)
+        {
+            try { if (File.Exists(installerPath)) File.Delete(installerPath); } catch { /* reintento limpio */ }
+
+            var installerUrl = $"https://maven.minecraftforge.net/net/minecraftforge/forge/{mcVersion}-{ForgeVersion}/forge-{mcVersion}-{ForgeVersion}-installer.jar";
+            _logService.Info($"Descargando instalador de Forge {mcVersion}-{ForgeVersion}...");
+            using (await DownloadLimiter.AcquireAsync(cancellationToken))
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(TimeSpan.FromMinutes(15));
+                using var resp = await Http.GetAsync(installerUrl, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                resp.EnsureSuccessStatusCode();
+                await using var source = await resp.Content.ReadAsStreamAsync(cts.Token);
+                await using var target = File.Create(installerPath);
+                var buffer = new byte[81920];
+                int read;
+                while ((read = await source.ReadAsync(buffer, cts.Token)) > 0)
+                {
+                    await DownloadLimiter.ThrottleAsync(read, cts.Token);
+                    await target.WriteAsync(buffer.AsMemory(0, read), cts.Token);
+                }
+            }
+
+            if (new FileInfo(installerPath).Length < 1024 * 1024)
+                throw new InvalidOperationException("El instalador de Forge descargado está incompleto");
+        }
+
         _logService.Info($"Ejecutando instalador de Forge {mcVersion}-{ForgeVersion}...");
 
         var java = await FindJavaForInstallerAsync(cancellationToken);
@@ -167,57 +198,91 @@ public class ForgeInstallService : IForgeInstallService
 
         Directory.CreateDirectory(targetDir);
 
+        // El instalador oficial exige un launcher_profiles.json con un perfil
+        // para la versión vanilla ("you need to run the launcher first").
+        EnsureLauncherProfile(targetDir, mcVersion);
+
         var psi = new ProcessStartInfo
         {
             FileName = java,
-            Arguments = $"-jar \"{universalJar}\" --installClient \"{targetDir}\"",
+            Arguments = $"-jar \"{installerPath}\" --installClient \"{targetDir}\"",
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
 
-try
+        try
+        {
+            using var process = Process.Start(psi);
+            if (process == null)
+                throw new InvalidOperationException("No se pudo iniciar el instalador de Forge");
+
+            var output = await process.StandardOutput.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromMinutes(15));
+            await process.WaitForExitAsync(cts.Token);
+
+            if (process.ExitCode != 0)
             {
-                using var process = Process.Start(psi);
-                if (process == null)
-                    throw new InvalidOperationException("No se pudo iniciar el instalador de Forge");
-
-                var output = await process.StandardOutput.ReadToEndAsync();
-                var error = await process.StandardError.ReadToEndAsync();
-
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                cts.CancelAfter(TimeSpan.FromMinutes(5));
-                await process.WaitForExitAsync(cts.Token);
-
-                if (process.ExitCode != 0)
-                {
-                    _logService.Error($"Forge installer falló (exit {process.ExitCode}): {error}\n{output}");
-                    throw new InvalidOperationException($"Forge installer falló: {error}");
-                }
-
-                _logService.Info($"Instalador de Forge completado: {output}");
-
-                // Copiar el universal jar como client jar en la versión instalada
-                var versionDir = Path.Combine(targetDir, "versions", $"{mcVersion}-forge-{ForgeVersion}");
-                Directory.CreateDirectory(versionDir);
-                var targetJar = Path.Combine(versionDir, $"{mcVersion}-forge-{ForgeVersion}.jar");
-                if (!File.Exists(targetJar))
-                {
-                    File.Copy(universalJar, targetJar, overwrite: true);
-                    _logService.Info($"Jar de Forge copiado a {targetJar}");
-                }
+                _logService.Error($"Forge installer falló (exit {process.ExitCode}): {error}\n{output}");
+                throw new InvalidOperationException($"Forge installer falló (exit {process.ExitCode}). Revisá tu conexión e intentá de nuevo.");
             }
-            catch (OperationCanceledException)
+
+            _logService.Info("Instalador de Forge completado correctamente");
+
+            // El instalador crea el version.json + librerías, pero no el jar
+            // de la versión: se usa el universal jar como client jar.
+            var versionDir = Path.Combine(targetDir, "versions", $"{mcVersion}-forge-{ForgeVersion}");
+            Directory.CreateDirectory(versionDir);
+            var targetJar = Path.Combine(versionDir, $"{mcVersion}-forge-{ForgeVersion}.jar");
+            if (!File.Exists(targetJar))
             {
-                throw;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logService.Error($"Error ejecutando instalador Forge: {ex.Message}");
-                throw;
+                File.Copy(universalJar, targetJar, overwrite: true);
+                _logService.Info($"Jar de Forge copiado a {targetJar}");
             }
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logService.Error($"Error ejecutando instalador Forge: {ex.Message}");
+            throw;
+        }
+    }
+
+    private static void EnsureLauncherProfile(string targetDir, string mcVersion)
+    {
+        try
+        {
+            var profilesPath = Path.Combine(targetDir, "launcher_profiles.json");
+            if (File.Exists(profilesPath)) return;
+
+            var now = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+            var json = "{\n"
+                + "  \"profiles\": {\n"
+                + $"    \"{mcVersion}\": {{\n"
+                + $"      \"name\": \"{mcVersion}\",\n"
+                + "      \"type\": \"custom\",\n"
+                + $"      \"created\": \"{now}\",\n"
+                + $"      \"lastUsed\": \"{now}\",\n"
+                + "      \"icon\": \"Grass\",\n"
+                + $"      \"lastVersionId\": \"{mcVersion}\"\n"
+                + "    }\n"
+                + "  },\n"
+                + "  \"version\": 3\n"
+                + "}";
+            File.WriteAllText(profilesPath, json);
+        }
+        catch
+        {
+            // Si no se puede crear, el instalador dará su propio error.
+        }
+    }
 
     private async Task<string?> FindJavaForInstallerAsync(CancellationToken cancellationToken)
     {

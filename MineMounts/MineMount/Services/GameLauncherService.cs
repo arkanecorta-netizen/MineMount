@@ -98,6 +98,7 @@ public class GameLauncherService : IGameLauncherService
     private readonly INotificationService _notificationService;
     private readonly IMinecraftInstallService _minecraftInstall;
     private readonly IForgeInstallService _forgeInstall;
+    private readonly IJavaDownloaderService _javaDownloader;
     private readonly IAuthService _authService;
 
     private Process? _runningProcess;
@@ -117,6 +118,7 @@ public class GameLauncherService : IGameLauncherService
         INotificationService notificationService,
         IMinecraftInstallService minecraftInstall,
         IForgeInstallService forgeInstall,
+        IJavaDownloaderService javaDownloader,
         IAuthService authService)
     {
         _seriesService = seriesService;
@@ -126,6 +128,7 @@ public class GameLauncherService : IGameLauncherService
         _notificationService = notificationService;
         _minecraftInstall = minecraftInstall;
         _forgeInstall = forgeInstall;
+        _javaDownloader = javaDownloader;
         _authService = authService;
     }
 
@@ -529,14 +532,32 @@ public class GameLauncherService : IGameLauncherService
                 await _forgeInstall.InstallForgeAsync(mcVersion, progress, CancellationToken.None);
             }
 
-            // Java según la versión de MC (<=1.16 → 8 · 1.17–1.20.4 → 17 · >=1.20.5 → 21)
-            var java = await FindJavaAsync(GetRequiredJava(mcVersion));
+            // Java según la versión de MC (<=1.16 → 8 · 1.17–1.20.4 → 17 · >=1.20.5 → 21).
+            // Si no hay ninguno compatible, se descarga automáticamente (Adoptium).
+            var requiredJava = GetRequiredJava(mcVersion);
+            var java = await FindJavaAsync(requiredJava);
             if (java == null)
             {
-                result.Message = "Java 17 no fue encontrado. Instalá Java 17 o configurá su ruta.";
+                _notificationService.NotifyInfo(
+                    "Descargando Java",
+                    $"Instalando Java {requiredJava}...");
+                _logService.Info($"Java {requiredJava} no encontrado: descargando automáticamente");
+                try
+                {
+                    await _javaDownloader.DownloadJavaAsync(requiredJava, progress, CancellationToken.None);
+                    java = await FindJavaAsync(requiredJava);
+                }
+                catch (Exception ex)
+                {
+                    _logService.Warning($"Descarga automática de Java falló: {ex.Message}");
+                }
+            }
+            if (java == null)
+            {
+                result.Message = $"Java {requiredJava} no fue encontrado. Instalá Java {requiredJava} o configurá su ruta.";
                 _notificationService.NotifyError(
-                    "Java 17 no encontrado",
-                    "Forge 1.20.1 necesita Java 17. Instalá Java 17 o configurá su ruta en Configuración → Juego.");
+                    $"Java {requiredJava} no encontrado",
+                    $"Minecraft {mcVersion} necesita Java {requiredJava}. Instalá Java {requiredJava} o configurá su ruta en Configuración → Juego.");
                 return result;
             }
 

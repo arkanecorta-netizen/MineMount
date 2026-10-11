@@ -417,7 +417,7 @@
                                 <Button Command="{Binding PlayPrimaryCommand}"
                                         IsEnabled="{Binding CanPlayPrimary}"
                                         Tag="{Binding EnableAnimations}"
-                                        Width="220" Height="56"
+                                        Width="232" Height="56"
                                         AutomationProperties.Name="Jugar">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource Button.Play}">
@@ -431,18 +431,31 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <ContentControl Content="{StaticResource IconPlaySolid}"
+                                    <Grid VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ContentControl Grid.Column="0"
+                                                        Content="{StaticResource IconPlaySolid}"
                                                         Width="26" Height="26"
                                                         VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding PlayButtonText}"
-                                                   VerticalAlignment="Center"
-                                                   Margin="12,0,0,0"
-                                                   FontFamily="{StaticResource FontFamilyDisplay}"
-                                                   FontWeight="Bold"
-                                                   FontSize="22"
-                                                   Foreground="White" />
-                                    </StackPanel>
+                                        <!-- Viewbox DownOnly: textos largos (REINTENTAR,
+                                             PRÓXIMAMENTE, ACTUALIZAR) se achican en vez
+                                             de cortarse; nunca agranda. -->
+                                        <Viewbox Grid.Column="1"
+                                                 Stretch="Uniform"
+                                                 StretchDirection="DownOnly"
+                                                 Margin="12,0,0,0"
+                                                 VerticalAlignment="Center"
+                                                 MaxHeight="34">
+                                            <TextBlock Text="{Binding PlayButtonText}"
+                                                       FontFamily="{StaticResource FontFamilyDisplay}"
+                                                       FontWeight="Bold"
+                                                       FontSize="22"
+                                                       Foreground="White" />
+                                        </Viewbox>
+                                    </Grid>
                                 </Button>
                                 <TextBlock Text="{Binding PlayStatusDetail}"
                                            Margin="2,8,0,0"

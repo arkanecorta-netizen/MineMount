@@ -417,7 +417,7 @@
         <Setter Property="Foreground" Value="White" />
         <Setter Property="Background" Value="{DynamicResource PlayGradientBrush}" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Padding" Value="40,0" />
+        <Setter Property="Padding" Value="28,0" />
         <Setter Property="MinHeight" Value="56" />
         <Setter Property="MinWidth" Value="220" />
         <Setter Property="Cursor" Value="Hand" />

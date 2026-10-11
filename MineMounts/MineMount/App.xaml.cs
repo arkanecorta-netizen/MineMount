@@ -160,6 +160,7 @@ public partial class App : Application
         await splash.RunAsync();
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+        MainWindow = mainWindow;
         mainWindow.Show();
         splash.Close();
     }
