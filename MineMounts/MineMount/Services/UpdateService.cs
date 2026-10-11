@@ -560,7 +560,18 @@ public class UpdateService : IUpdateService
     {
         if (!Version.TryParse(NormalizeVersion(candidate), out var c)) return false;
         if (!Version.TryParse(NormalizeVersion(current), out var cur)) return false;
-        return c > cur;
+        if (c != cur) return c > cur;
+        // Misma base numérica (p.ej. 1.1.16 vs 1.1.16b): la letra manda.
+        return SuffixRank(candidate) > SuffixRank(current);
+    }
+
+    /// <summary>Rango del sufijo de letra (1.1.16 → 0, 1.1.16a → 1, 1.1.16b → 2...).</summary>
+    private static int SuffixRank(string tag)
+    {
+        var t = tag.Trim().TrimStart('v', 'V');
+        var m = System.Text.RegularExpressions.Regex.Match(t, @"^\d+(\.\d+){0,3}([a-zA-Z])");
+        if (!m.Success) return 0;
+        return char.ToLowerInvariant(m.Groups[2].Value[0]) - 'a' + 1;
     }
 
     private bool ReachedApplyLimit(string target)
