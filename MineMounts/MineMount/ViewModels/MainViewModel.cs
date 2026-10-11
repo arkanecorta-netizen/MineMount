@@ -887,7 +887,7 @@ public partial class MainViewModel : ObservableObject
             {
                 UpdateStatus = "Instalando actualización...";
                 _logService.Info("Actualización descargada; aplicando y reiniciando");
-                _updateService.ApplyAndRestart();
+                await _updateService.ApplyAndRestartAsync();
             }
             else
             {

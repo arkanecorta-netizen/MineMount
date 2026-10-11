@@ -14,7 +14,10 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\{#MyAppName}
+; Instalación POR USUARIO (sin UAC): así el auto-updater reemplaza el
+; exe sin pedir permisos ni mostrar consolas. No usar {autopf}.
+DefaultDirName={localappdata}\Programs\{#MyAppName}
+UsePreviousAppDir=no
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=
@@ -33,7 +36,7 @@ VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription=MineMount Launcher
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 

@@ -1111,7 +1111,7 @@ public partial class SettingsViewModel : ObservableObject
         {
             var progress = new Progress<double>(p => UpdateProgress = p);
             if (await _updateService.DownloadUpdateAsync(progress))
-                _updateService.ApplyAndRestart();
+                await _updateService.ApplyAndRestartAsync();
             else
                 UpdateInfo = _updateService.LastError;
         }

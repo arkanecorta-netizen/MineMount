@@ -20,7 +20,7 @@ public interface IUpdateService
     Task<bool> CheckForUpdatesAsync();
     Task<bool> DownloadUpdateAsync(IProgress<double>? progress = null);
     Task<string?> DownloadSetupAsync(IProgress<double>? progress = null, CancellationToken cancellationToken = default);
-    bool ApplyAndRestart();
+    Task<bool> ApplyAndRestartAsync(IProgress<double>? progress = null, CancellationToken cancellationToken = default);
     string CurrentVersion { get; }
     string LatestVersion { get; }
     bool IsUpdateAvailable { get; }
@@ -450,9 +450,16 @@ public class UpdateService : IUpdateService
     }
 
     // ---------------------------------------------------------------
-    //  3. Aplicar: extraer, lanzar script updater y reiniciar
+    //  3. Aplicar: extraer y reiniciar.
+    //  - Carpeta escribible (instalación por usuario): reemplazo
+    //    silencioso con script oculto + reinicio automático. Sin UAC,
+    //    sin consola visible.
+    //  - Carpeta NO escribible (instalación vieja en Program Files):
+    //    se descarga el instalador completo y se ejecuta visible
+    //    (Inno pide el único UAC y migra a la carpeta por usuario).
     // ---------------------------------------------------------------
-    public bool ApplyAndRestart()
+    public async Task<bool> ApplyAndRestartAsync(
+        IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -487,17 +494,28 @@ public class UpdateService : IUpdateService
             var appDir = (Path.GetDirectoryName(appExe) ?? string.Empty)
                 .TrimEnd(Path.DirectorySeparatorChar);
             var pid = Environment.ProcessId;
-            var scriptPath = Path.Combine(StageDir, "apply.cmd");
 
-            // Aviso previo solo si la carpeta no es escribible (Program Files):
-            // Windows va a pedir permiso igual, pero al menos no sorprende.
             if (!IsDirectoryWritable(appDir))
             {
-                _notifications.NotifyWarning(
+                // Instalación legacy en Program Files: delegar en el
+                // instalador (un solo UAC familiar, sin CMD elevado).
+                _log.Info("Carpeta no escribible: actualizando vía instalador completo");
+                _notifications.NotifyInfo(
                     Loc.T("S.Update.NeedPerm"),
                     Loc.T("S.Update.NeedPermDesc"));
+                var setupPath = await DownloadSetupAsync(progress, cancellationToken);
+                if (setupPath is null)
+                {
+                    return false;
+                }
+
+                RegisterApplyAttempt(LatestVersion);
+                Process.Start(new ProcessStartInfo(setupPath) { UseShellExecute = true });
+                Application.Current.Shutdown();
+                return true;
             }
 
+            var scriptPath = Path.Combine(StageDir, "apply.cmd");
             var script = BuildApplyScript(pid, newExe, appDir, StageDir);
             File.WriteAllText(scriptPath, script);
 
@@ -512,7 +530,7 @@ public class UpdateService : IUpdateService
             });
 
             RegisterApplyAttempt(LatestVersion);
-            _log.Info($"Actualización {LatestVersion} aplicándose (script {scriptPath}); reiniciando...");
+            _log.Info($"Actualización {LatestVersion} aplicándose en segundo plano; reiniciando...");
 
             Application.Current.Shutdown();
             return true;
@@ -637,13 +655,11 @@ public class UpdateService : IUpdateService
 
     private static string BuildApplyScript(int pid, string newExe, string appDir, string stageDir)
     {
-        // Script updater, siempre oculto (nunca muestra consola):
+        // Script updater, siempre oculto (nunca muestra consola, nunca pide
+        // permisos: solo se usa cuando la carpeta ya se verificó escribible):
         //  1. Espera a que MineMount.exe (pid) termine
-        //  2. Intenta copiar; si falla por permisos, se relanza elevado UNA
-        //     vez (net session detecta si ya es admin: sin bucles de UAC)
+        //  2. Copia con reintentos (antivirus/locks) hasta 30 s
         //  3. Reinicia MineMount y limpia el staging
-        // Nota: en Program Files Windows exige el UAC sí o sí; eso lo
-        // pide el sistema, no se puede evitar desde el launcher.
         var lines = new[]
         {
             "@echo off",
@@ -658,12 +674,14 @@ public class UpdateService : IUpdateService
             "  timeout /t 1 /nobreak >nul",
             "  goto wait",
             ")",
+            "set \"TRIES=0\"",
+            ":copyretry",
             "copy /Y \"%NEW%\" \"%APPDIR%\\MineMount.exe\" >nul 2>&1",
             "if not errorlevel 1 goto started",
-            "net session >nul 2>&1",
-            "if not errorlevel 1 exit /b 1",
-            "powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command \"Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '%~f0' -Verb RunAs -WindowStyle Hidden\"",
-            "exit /b 0",
+            "set /a TRIES+=1",
+            "if %TRIES% GEQ 30 exit /b 1",
+            "timeout /t 1 /nobreak >nul",
+            "goto copyretry",
             ":started",
             "start \"\" \"%APPDIR%\\MineMount.exe\"",
             $"powershell -NoProfile -WindowStyle Hidden -Command \"Start-Sleep 5; Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '{stageDir}'\""

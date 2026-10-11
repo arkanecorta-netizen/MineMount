@@ -232,8 +232,10 @@ public partial class SplashScreen : Window
         UiStatus(Services.Loc.T("S.Splash.Installing"));
         progress.Report(95);
 
-        // Shutdown debe correr en el hilo UI aunque este paso vaya en fondo
-        if (!Dispatcher.Invoke(() => _updateService.ApplyAndRestart()))
+        // Shutdown debe correr en el hilo UI aunque este paso vaya en fondo.
+        // (Invoke devuelve el Task<bool>; se espera fuera del Dispatcher.)
+        var applyTask = Dispatcher.Invoke(() => _updateService.ApplyAndRestartAsync());
+        if (!await applyTask)
         {
             _logService.Warning(
                 $"Splash: no se pudo aplicar ({_updateService.LastError}); se continúa");
