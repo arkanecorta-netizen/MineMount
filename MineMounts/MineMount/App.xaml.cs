@@ -5,7 +5,11 @@ using MineMount.Services;
 using MineMount.ViewModels;
 using MineMount.Views;
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -14,10 +18,16 @@ namespace MineMount;
 public partial class App : Application
 {
     private readonly IHost _host;
+    private Mutex? _singleInstanceMutex;
 
     public App()
     {
         DispatcherUnhandledException += OnUnhandledException;
+
+        // Excepciones fuera del hilo UI (Task.Run, callbacks de proceso):
+        // se registran; sin esto matan el proceso sin ningún rastro.
+        AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
         _host = Host.CreateDefaultBuilder()
             .ConfigureServices((context, services) =>
@@ -34,9 +44,9 @@ public partial class App : Application
 
     private bool _handlingException;
 
-    private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    /// <summary>Log fatal síncrono y seguro (usable desde cualquier hilo).</summary>
+    private static void AppendFatalLog(string message)
     {
-        e.Handled = true;
         try
         {
             var dir = Path.Combine(
@@ -44,19 +54,28 @@ public partial class App : Application
                 "MineMount");
             Directory.CreateDirectory(dir);
             File.AppendAllText(Path.Combine(dir, "minemount.log"),
-                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [FATAL] {e.Exception}\n");
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [FATAL] {message}\n");
         }
         catch
         {
             // Ignorar errores de logging
         }
+    }
+
+    private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        AppendFatalLog(e.Exception.ToString());
 
         if (_handlingException)
         {
+            // Segunda excepción mientras se mostraba el diálogo de error:
+            // se registra y se propaga (la app ya está en estado dudoso;
+            // ocultarla dejaría al usuario con una app "viva" rota).
             return;
         }
 
         _handlingException = true;
+        e.Handled = true;
 
         MessageBox.Show(
             "MineMount encontró un error y debe cerrarse.\n\n" +
@@ -67,6 +86,17 @@ public partial class App : Application
             MessageBoxImage.Error);
 
         Shutdown(1);
+    }
+
+    private void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        AppendFatalLog(e.ExceptionObject?.ToString() ?? "Excepción sin objeto");
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        AppendFatalLog($"Task no observada: {e.Exception}");
+        e.SetObserved();
     }
 
     private void ConfigureServices(IServiceCollection services)
@@ -122,6 +152,16 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Instancia única: dos launchers en paralelo se pisaban cachés,
+        // estado de actualización y staging.
+        _singleInstanceMutex = new Mutex(true, @"Local\MineMount.SingleInstance", out var isNewInstance);
+        if (!isNewInstance)
+        {
+            ActivateExistingInstance();
+            Shutdown();
+            return;
+        }
+
         await _host.StartAsync();
 
         // Cargar configuración antes de construir las vistas (evita carreras de carga)
@@ -165,11 +205,81 @@ public partial class App : Application
         splash.Close();
     }
 
-    protected override async void OnExit(ExitEventArgs e)
+    protected override void OnExit(ExitEventArgs e)
     {
-        await _host.StopAsync();
-        _host.Dispose();
+        // Cierre síncrono acotado: en OnExit un await real nunca alcanza a
+        // ejecutarse (WPF apaga el dispatcher justo después), y las
+        // excepciones de StopAsync en async void se perdían en silencio.
+        try
+        {
+            _host.StopAsync().Wait(TimeSpan.FromSeconds(5));
+        }
+        catch (Exception ex)
+        {
+            AppendFatalLog($"Error al detener el host: {ex}");
+        }
+
+        try
+        {
+            _host.Dispose();
+        }
+        catch (Exception ex)
+        {
+            AppendFatalLog($"Error al disposear el host: {ex}");
+        }
+
+        try
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+            _singleInstanceMutex?.Dispose();
+        }
+        catch
+        {
+            // El mutex ya pudo liberarse por abandono.
+        }
+
         base.OnExit(e);
+    }
+
+    /// <summary>Trayende al frente la instancia que ya está corriendo.</summary>
+    private static void ActivateExistingInstance()
+    {
+        try
+        {
+            var current = Environment.ProcessId;
+            foreach (var p in Process.GetProcessesByName("MineMount"))
+            {
+                try
+                {
+                    if (p.Id == current) continue;
+                    if (p.MainWindowHandle != IntPtr.Zero)
+                    {
+                        NativeMethods.ShowWindow(p.MainWindowHandle, NativeMethods.SW_RESTORE);
+                        NativeMethods.SetForegroundWindow(p.MainWindowHandle);
+                        break;
+                    }
+                }
+                catch
+                {
+                    // Proceso que terminó entre enumeración y acceso.
+                }
+            }
+        }
+        catch
+        {
+            // Activación best-effort.
+        }
+    }
+
+    private static class NativeMethods
+    {
+        public const int SW_RESTORE = 9;
+
+        [DllImport("user32.dll")]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     }
 
     public static T GetService<T>() where T : notnull

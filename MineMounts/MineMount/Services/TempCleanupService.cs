@@ -30,65 +30,96 @@ public class TempCleanupService : ITempCleanupService
     // ---------------------------------------------------------------
     //  Limpieza al iniciar: operaciones temporales antiguas
     // ---------------------------------------------------------------
-    public async Task CleanupStartupAsync()
+    public Task CleanupStartupAsync()
+    {
+        // Todo el cuerpo en threadpool: borrar árboles grandes de forma
+        // sincrónica congelaba el splash (corría en el hilo UI).
+        return Task.Run(() =>
+        {
+            try
+            {
+                var cleaned = 0;
+
+                // 1. Raíz temporal de MineMount
+                if (Directory.Exists(TempRoot))
+                {
+                    foreach (var entry in Directory.EnumerateFileSystemEntries(TempRoot))
+                    {
+                        if (TryDelete(entry)) cleaned++;
+                    }
+                }
+
+                // 2. Staging de series abandonado (instalaciones canceladas)
+                var appData = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "MineMount");
+                var stageDir = Path.Combine(appData, "cache", "series", "stage");
+                if (Directory.Exists(stageDir))
+                {
+                    foreach (var entry in Directory.EnumerateFileSystemEntries(stageDir))
+                    {
+                        if (TryDelete(entry)) cleaned++;
+                    }
+                }
+
+                // 3. ZIPs .tmp huérfanos de descargas interrumpidas
+                var cacheDir = Path.Combine(appData, "cache", "series");
+                if (Directory.Exists(cacheDir))
+                {
+                    foreach (var file in Directory.EnumerateFiles(cacheDir, "*.tmp", SearchOption.AllDirectories))
+                    {
+                        if (TryDelete(file)) cleaned++;
+                    }
+                }
+
+                // 4. Staging de actualizaciones del launcher.
+                //    Protegido: si apply.cmd está copiando (estado fresco),
+                //    borrar el staging ahora rompería la actualización.
+                var updateStage = Path.Combine(appData, "updates", "stage");
+                if (Directory.Exists(updateStage) && !IsUpdateApplyPending(appData))
+                {
+                    foreach (var entry in Directory.EnumerateFileSystemEntries(updateStage))
+                    {
+                        if (TryDelete(entry)) cleaned++;
+                    }
+                }
+
+                if (cleaned > 0)
+                {
+                    _logService.Info($"Limpieza de temporales: {cleaned} elementos eliminados");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.Warning($"Limpieza de temporales incompleta: {ex.Message}");
+            }
+        });
+    }
+
+    /// <summary>
+    /// True si hay una aplicación de actualización reciente (&lt; 10 min):
+    /// en ese caso el staging es de un apply.cmd en curso y no se toca.
+    /// </summary>
+    private static bool IsUpdateApplyPending(string appData)
     {
         try
         {
-            var cleaned = 0;
+            var statePath = Path.Combine(appData, "update-state.json");
+            if (!File.Exists(statePath)) return false;
 
-            // 1. Raíz temporal de MineMount
-            if (Directory.Exists(TempRoot))
-            {
-                foreach (var entry in Directory.EnumerateFileSystemEntries(TempRoot))
-                {
-                    if (TryDelete(entry)) cleaned++;
-                }
-            }
+            using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(statePath));
+            var root = doc.RootElement;
 
-            // 2. Staging de series abandonado (instalaciones canceladas)
-            var appData = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "MineMount");
-            var stageDir = Path.Combine(appData, "cache", "series", "stage");
-            if (Directory.Exists(stageDir))
-            {
-                foreach (var entry in Directory.EnumerateFileSystemEntries(stageDir))
-                {
-                    if (TryDelete(entry)) cleaned++;
-                }
-            }
+            if (!root.TryGetProperty("Timestamp", out var tsProp)) return false;
+            if (!DateTimeOffset.TryParse(tsProp.GetString(), out var ts)) return false;
 
-            // 3. ZIPs .tmp huérfanos de descargas interrumpidas
-            var cacheDir = Path.Combine(appData, "cache", "series");
-            if (Directory.Exists(cacheDir))
-            {
-                foreach (var file in Directory.EnumerateFiles(cacheDir, "*.tmp", SearchOption.AllDirectories))
-                {
-                    if (TryDelete(file)) cleaned++;
-                }
-            }
-
-            // 4. Staging de actualizaciones del launcher
-            var updateStage = Path.Combine(appData, "updates", "stage");
-            if (Directory.Exists(updateStage))
-            {
-                foreach (var entry in Directory.EnumerateFileSystemEntries(updateStage))
-                {
-                    if (TryDelete(entry)) cleaned++;
-                }
-            }
-
-            if (cleaned > 0)
-            {
-                _logService.Info($"Limpieza de temporales: {cleaned} elementos eliminados");
-            }
+            return DateTimeOffset.UtcNow - ts < TimeSpan.FromMinutes(10);
         }
-        catch (Exception ex)
+        catch
         {
-            _logService.Warning($"Limpieza de temporales incompleta: {ex.Message}");
+            // Estado ilegible: se limpia con normalidad.
+            return false;
         }
-
-        await Task.CompletedTask;
     }
 
     // ---------------------------------------------------------------

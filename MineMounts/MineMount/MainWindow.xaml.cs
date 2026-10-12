@@ -231,13 +231,14 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Guarda tamaño, posición y estado al cerrar (sin bloquear la UI).</summary>
+    /// <summary>Guarda tamaño, posición y estado al cerrar (espera acotada).</summary>
     private void SaveWindowBounds()
     {
         try
         {
-            // Lecturas sincrónicas en el hilo UI; el IO va a un hilo de fondo
-            // (Task.Run evita el deadlock del contexto de sincronización).
+            // Lecturas sincrónicas en el hilo UI; el IO va a un hilo de
+            // fondo con espera MÁXIMA de 2 s: normalmente termina en
+            // milisegundos, y un disco lento no puede colgar el cierre.
             var maximized = WindowState == WindowState.Maximized;
             var width = ActualWidth;
             var height = ActualHeight;
@@ -259,7 +260,7 @@ public partial class MainWindow : Window
                 }
 
                 await service.SaveSettingsAsync(s);
-            }).GetAwaiter().GetResult();
+            }).Wait(TimeSpan.FromSeconds(2));
         }
         catch
         {

@@ -875,6 +875,14 @@ public partial class MainViewModel : ObservableObject
             IsDownloading = true;
             UpdateProgress = 0;
 
+            if (string.IsNullOrEmpty(_updateService.LatestVersion)
+                && !await _updateService.CheckForUpdatesAsync())
+            {
+                UpdateStatus = _updateService.LastError;
+                StatusText = "Error de actualización";
+                return;
+            }
+
             var progress = new Progress<double>(p =>
             {
                 UpdateProgress = p;

@@ -13,7 +13,14 @@ namespace MineMount.Views;
 public partial class SplashScreen : Window
 {
     private const int MinDurationMs = 2_500;
-    private const int MaxDurationMs = 20_000;
+
+    // Tope duro del splash: incluye la descarga de una actualización
+    // (decenas de MB). Al superarse, se cancela la actualización y se
+    // continúa al escritorio (se reintenta en el próximo inicio).
+    private const int MaxDurationMs = 300_000;
+
+    // Límite propio de la descarga/aplicación de updates dentro del splash.
+    private const int UpdateDeadlineMs = 240_000;
 
     private readonly ISettingsService _settingsService;
     private readonly IUpdateService _updateService;
@@ -98,13 +105,18 @@ public partial class SplashScreen : Window
         {
             var idx = i;
             var (label, weight, work) = mid[idx];
+
+            // Progress creado en el hilo UI: sus callbacks caen en el
+            // dispatcher, evitando la carrera de escritura/lectura de
+            // frac[] entre el threadpool y el loop de progreso.
+            var progress = Dispatcher.Invoke(() => new Progress<double>(p => frac[idx] = p));
+
             running.Add(Task.Run(async () =>
             {
                 // SetStatus toca la UI: volver al hilo del Dispatcher
                 Dispatcher.Invoke(() => SetStatus(label));
                 _logService.Info($"Splash: {label}");
 
-                var progress = new Progress<double>(p => frac[idx] = p);
                 try
                 {
                     await work(progress);
@@ -115,12 +127,24 @@ public partial class SplashScreen : Window
                 }
 
                 if (frac[idx] < 100)
-                    await AnimateStepProgress(() => frac[idx], p => frac[idx] = p, 200);
-                frac[idx] = 100;
+                {
+                    await AnimateStepProgress(
+                        () => frac[idx],
+                        p => Dispatcher.Invoke(() => frac[idx] = p),
+                        200);
+                }
+
+                Dispatcher.Invoke(() => frac[idx] = 100);
             }));
         }
 
         var midWeight = mid.Sum(s => s.Weight);
+        var allMid = Task.WhenAll(running);
+
+        // Observar los que queden abandonados para que sus fallos no
+        // terminen como excepciones no observadas.
+        _ = allMid.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+
         while (running.Any(t => !t.IsCompleted))
         {
             if (_stopwatch.ElapsedMilliseconds >= MaxDurationMs) break;
@@ -130,7 +154,18 @@ public partial class SplashScreen : Window
             UpdateProgress(currentProgress);
             await Task.Delay(100);
         }
-        await Task.WhenAll(running);
+
+        if (!allMid.IsCompleted)
+        {
+            // Tope adicional corto tras romper el loop: no colgar el
+            // arranque esperando una tarea que ya sabemos lenta.
+            await Task.WhenAny(allMid, Task.Delay(30_000));
+            if (!allMid.IsCompleted)
+            {
+                _logService.Warning("Splash: pasos paralelos no completaron a tiempo; se continúa");
+            }
+        }
+
         completedWeight += midWeight;
         currentProgress = completedWeight * 100.0 / totalWeight;
         UpdateProgress(currentProgress);
@@ -219,7 +254,12 @@ public partial class SplashScreen : Window
             progress.Report(p);
         });
 
-        var ok = await _updateService.DownloadUpdateAsync(downloadProgress);
+        // La actualización en el splash tiene presupuesto de tiempo: si la
+        // red no llega, se posterga al próximo inicio en vez de dejar el
+        // splash colgado (o la app usándose con una descarga zombi).
+        using var updateCts = new CancellationTokenSource(UpdateDeadlineMs);
+
+        var ok = await _updateService.DownloadUpdateAsync(downloadProgress, updateCts.Token);
 
         if (!ok)
         {
@@ -234,7 +274,8 @@ public partial class SplashScreen : Window
 
         // Shutdown debe correr en el hilo UI aunque este paso vaya en fondo.
         // (Invoke devuelve el Task<bool>; se espera fuera del Dispatcher.)
-        var applyTask = Dispatcher.Invoke(() => _updateService.ApplyAndRestartAsync());
+        var applyTask = Dispatcher.Invoke(() =>
+            _updateService.ApplyAndRestartAsync(cancellationToken: updateCts.Token));
         if (!await applyTask)
         {
             _logService.Warning(

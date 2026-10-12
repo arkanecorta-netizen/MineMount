@@ -1081,6 +1081,13 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             var progress = new Progress<double>(p => SetupProgress = p);
+            if (string.IsNullOrEmpty(_updateService.LatestVersion)
+                && !await _updateService.CheckForUpdatesAsync())
+            {
+                UpdateInfo = _updateService.LastError;
+                return;
+            }
+
             var path = await _updateService.DownloadSetupAsync(progress);
             if (!string.IsNullOrWhiteSpace(path))
             {
@@ -1109,6 +1116,13 @@ public partial class SettingsViewModel : ObservableObject
         UpdateProgress = 0;
         try
         {
+            if (string.IsNullOrEmpty(_updateService.LatestVersion)
+                && !await _updateService.CheckForUpdatesAsync())
+            {
+                UpdateInfo = _updateService.LastError;
+                return;
+            }
+
             var progress = new Progress<double>(p => UpdateProgress = p);
             if (await _updateService.DownloadUpdateAsync(progress))
                 await _updateService.ApplyAndRestartAsync();
