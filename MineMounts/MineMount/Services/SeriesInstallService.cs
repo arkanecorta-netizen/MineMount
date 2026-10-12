@@ -238,7 +238,8 @@ public class SeriesInstallService : ISeriesInstallService
 
         // Espacio insuficiente: NO comenzar la descarga.
         // Estimación: ZIP + extracción (manifest) + margen de seguridad.
-        var requiredMB = EstimateRequiredSpaceMB(package, seriesDir);
+        // (async: un .Result aquí colgaba la UI en deadlock.)
+        var requiredMB = await EstimateRequiredSpaceMBAsync(package, seriesDir, cancellationToken);
         var freeMB = _diskSpaceService.GetFreeSpaceMB(seriesDir);
         _logService.Info(
             $"Espacio: {_diskSpaceService.FormatSize(freeMB * 1024 * 1024)} libres, " +
@@ -258,8 +259,10 @@ public class SeriesInstallService : ISeriesInstallService
 
         var zipPath = Path.Combine(_cacheDir, $"{definition.Id}-{definition.Version}.zip");
 
-        // 1. Descarga (o reutiliza caché si el hash ya coincide)
-        if (File.Exists(zipPath) && IsCachedPackageValid(zipPath, package))
+        // 1. Descarga (o reutiliza caché si el hash ya coincide).
+        // El hash del ZIP (30+ MB) se calcula en threadpool: en la UI se traba.
+        if (File.Exists(zipPath)
+            && await Task.Run(() => IsCachedPackageValid(zipPath, package), cancellationToken))
         {
             _logService.Info($"Paquete de {definition.Id} en caché, se omite la descarga");
             report(1, 60, "Paquete en caché");
@@ -272,44 +275,61 @@ public class SeriesInstallService : ISeriesInstallService
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // 2. Validar y extraer a staging
+        // 2. Validar y extraer a staging (CPU/IO pesado → threadpool, la UI
+        // quedaba congelada varios segundos con paquetes de 30+ MB).
         report(2, 60, "Validando paquete...");
         var stageRoot = Path.Combine(_stageDir, definition.Id);
         if (Directory.Exists(stageRoot)) Directory.Delete(stageRoot, recursive: true);
         Directory.CreateDirectory(stageRoot);
 
-        var manifest = ExtractAndVerify(zipPath, stageRoot, (done, total) =>
+        var lastExtractReport = DateTime.MinValue;
+        var manifest = await Task.Run(() => ExtractAndVerify(zipPath, stageRoot, (done, total) =>
         {
+            // Throttle: no inundar la UI con cientos de reportes/segundo.
+            var now = DateTime.UtcNow;
+            if (done < total && now - lastExtractReport < TimeSpan.FromMilliseconds(200)) return;
+            lastExtractReport = now;
             var percent = total > 0 ? 60 + (done * 25.0 / total) : 85;
             report(2, percent, $"Extrayendo {done}/{total} archivos...");
-        }, cancellationToken);
+        }, cancellationToken), cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // 3. Fusionar en la carpeta de la serie (sobrescribe, no borra ajenos)
+        // 3. Fusionar en la carpeta de la serie (sobrescribe, no borra ajenos).
+        // Copia de archivos en threadpool con progreso throttled.
         report(3, 85, "Instalando archivos...");
-        var stagedFiles = Directory.GetFiles(stageRoot, "*", SearchOption.AllDirectories);
-        var copied = 0;
-        foreach (var source in stagedFiles)
+        var lastCopyReport = DateTime.MinValue;
+        var copied = await Task.Run(() =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var relative = Path.GetRelativePath(stageRoot, source);
-            if (string.Equals(relative, "manifest.json", StringComparison.OrdinalIgnoreCase))
+            var stagedFiles = Directory.GetFiles(stageRoot, "*", SearchOption.AllDirectories);
+            var n = 0;
+            foreach (var source in stagedFiles)
             {
-                continue;
-            }
+                cancellationToken.ThrowIfCancellationRequested();
 
-            var dest = SeriesStorageService.ResolveInside(seriesDir, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-            File.Copy(source, dest, overwrite: true);
+                var relative = Path.GetRelativePath(stageRoot, source);
+                if (string.Equals(relative, "manifest.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
 
-            copied++;
-            if (stagedFiles.Length > 0)
-            {
-                report(3, 85 + (copied * 14.0 / stagedFiles.Length), $"Instalando {copied}/{stagedFiles.Length}...");
+                var dest = SeriesStorageService.ResolveInside(seriesDir, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                File.Copy(source, dest, overwrite: true);
+
+                n++;
+                var now = DateTime.UtcNow;
+                if (n >= stagedFiles.Length || now - lastCopyReport >= TimeSpan.FromMilliseconds(200))
+                {
+                    lastCopyReport = now;
+                    if (stagedFiles.Length > 0)
+                    {
+                        report(3, 85 + (n * 14.0 / stagedFiles.Length), $"Instalando {n}/{stagedFiles.Length}...");
+                    }
+                }
             }
-        }
+            return n;
+        }, cancellationToken);
 
         // 3b. Guardar metadatos: installation.json + manifest.json
         var installation = new SeriesInstallation
@@ -321,7 +341,7 @@ public class SeriesInstallService : ISeriesInstallService
             Status = "installed",
             Path = seriesDir,
             PackageSha256 = string.IsNullOrWhiteSpace(package.Sha256)
-                ? SeriesStorageService.ComputeSha256(zipPath)
+                ? await Task.Run(() => SeriesStorageService.ComputeSha256(zipPath), cancellationToken)
                 : package.Sha256
         };
 
@@ -373,19 +393,30 @@ public class SeriesInstallService : ISeriesInstallService
     }
 
     // Estimación razonable del espacio necesario:
-    //   ZIP descargado + extracción (tamaño del manifest) + margen 20%
-    private long EstimateRequiredSpaceMB(SeriesPackageInfo package, string seriesDir)
+    //   ZIP descargado + extracción (tamaño del manifest) + margen 20%.
+    // OJO: nunca .Result sobre async en este path (deadlock de la UI).
+    private async Task<long> EstimateRequiredSpaceMBAsync(
+        SeriesPackageInfo package, string seriesDir, CancellationToken cancellationToken)
     {
         long zipSize = package.Size > 0 ? package.Size : 100 * 1024 * 1024;
 
         long extracted = 0;
         try
         {
-            var manifest = _storageService.ReadPackageManifestAsync(seriesDir).Result;
+            cancellationToken.ThrowIfCancellationRequested();
+            var manifest = await _storageService.ReadPackageManifestAsync(seriesDir);
             if (manifest?.Files != null)
             {
                 extracted = manifest.Files.Sum(f => f.Size);
             }
+            else
+            {
+                extracted = zipSize * 2;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

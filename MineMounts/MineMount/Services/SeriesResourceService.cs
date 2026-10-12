@@ -274,7 +274,8 @@ public class SeriesResourceService : ISeriesResourceService
         if (!string.IsNullOrWhiteSpace(package.Sha256))
         {
             Report("Verificando hash...");
-            var actual = SeriesStorageService.ComputeSha256(tempPath);
+            var actual = await Task.Run(
+                () => SeriesStorageService.ComputeSha256(tempPath), cancellationToken);
             if (!string.Equals(actual, package.Sha256, StringComparison.OrdinalIgnoreCase))
             {
                 File.Delete(tempPath);

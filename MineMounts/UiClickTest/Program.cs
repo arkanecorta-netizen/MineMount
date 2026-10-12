@@ -120,17 +120,26 @@ public static class Program
         Console.WriteLine($"CanPlayPrimary={mainVm.CanPlayPrimary} PlayButtonText={mainVm.PlayButtonText}");
 
         Console.WriteLine("Ejecutando PlayPrimaryCommand (equivale al click en JUGAR)...");
-        await mainVm.PlayPrimaryCommand.ExecuteAsync(null);
+        var clickTask = mainVm.PlayPrimaryCommand.ExecuteAsync(null);
+        // Watchdog anti-freeze: si el comando no termina en 12 min, la UI se trabó.
+        var finished = await Task.WhenAny(clickTask, Task.Delay(TimeSpan.FromMinutes(12)));
+        if (!clickTask.IsCompleted)
+        {
+            Console.WriteLine("FAIL: PlayPrimaryCommand no terminó en 12 min (UI trabada).");
+            _failures++;
+            return 1;
+        }
+        await clickTask;
         Console.WriteLine($"Post-click: IsGameRunning={mainVm.IsGameRunning} PlayButtonText={mainVm.PlayButtonText} HasError={mainVm.PlayHasError}");
 
-        if (!mainVm.IsGameRunning)
+        if (mainVm.PlayHasError)
         {
-            Console.WriteLine($"FAIL: el juego no arrancó. Detalle: {mainVm.PlayStatusDetail}");
+            Console.WriteLine($"FAIL: error tras el click. Detalle: {mainVm.PlayStatusDetail}");
             _failures++;
         }
-        else
+        else if (mainVm.IsGameRunning)
         {
-            Console.WriteLine("PASS: proceso del juego iniciado desde el comando del botón.");
+            Console.WriteLine("PASS: proceso del juego iniciado desde el comando del botón (sin trabas).");
             // Esperar a que el juego arranque del todo y salga (headless cierra solo)
             var deadline = DateTime.UtcNow.AddMinutes(15);
             while (mainVm.IsGameRunning && DateTime.UtcNow < deadline)
@@ -144,6 +153,15 @@ public static class Program
                 var full = File.ReadAllText(logPath);
                 Check("log muestra boot de ModLauncher", true, () => full.Contains("ModLauncher running"));
             }
+        }
+        else
+        {
+            // Rama instalar/actualizar/reparar: debe terminar sin error y sin trabarse.
+            await mainVm.RefreshPlaySeriesAsync();
+            var after = mainVm.AvailableSeries.FirstOrDefault(s => s.Id == series.Id);
+            Console.WriteLine($"Post-operación: status={after?.Status} version={after?.Version}");
+            Check("operación (instalar/actualizar) terminó sin error ni trabas", true,
+                () => after != null && after.Status == MineMount.Models.SeriesStatus.Installed);
         }
 
         // T3: comandos de tarjeta (⋯ Reparar / Abrir carpeta)
