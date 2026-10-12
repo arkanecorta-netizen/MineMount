@@ -162,6 +162,7 @@ public class SeriesResourceService : ISeriesResourceService
             }
             catch (OperationCanceledException)
             {
+                TryDeleteTemp(destPath);
                 throw;
             }
             catch (Exception ex) when (attempt < MaxAttempts)
@@ -170,7 +171,39 @@ public class SeriesResourceService : ISeriesResourceService
                     $"Descarga de {Path.GetFileName(destPath)} falló (intento {attempt}/{MaxAttempts}): {ex.Message}");
                 await Task.Delay(TimeSpan.FromSeconds(attempt), cancellationToken);
             }
+            catch (Exception)
+            {
+                // Último intento fallido: no dejar el .tmp huérfano en caché
+                TryDeleteTemp(destPath);
+                throw;
+            }
         }
+    }
+
+    private static void TryDeleteTemp(string destPath)
+    {
+        try
+        {
+            var tmp = destPath + ".tmp";
+            if (File.Exists(tmp)) File.Delete(tmp);
+        }
+        catch
+        {
+            // Limpieza best-effort (se reintenta en la próxima descarga)
+        }
+    }
+
+    /// <summary>
+    /// En producción el paquete solo puede venir de GitHub. Cualquier otro
+    /// host requeriría una respuesta del API comprometida o un MITM.
+    /// </summary>
+    private static bool IsAllowedHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return false;
+        return host.Equals("github.com", StringComparison.OrdinalIgnoreCase)
+               || host.EndsWith(".github.com", StringComparison.OrdinalIgnoreCase)
+               || host.Equals("githubusercontent.com", StringComparison.OrdinalIgnoreCase)
+               || host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task DownloadOnceAsync(
@@ -222,12 +255,19 @@ public class SeriesResourceService : ISeriesResourceService
         }
 
         // En producción el paquete SIEMPRE viene de GitHub (HTTPS).
-        // HTTP y file:// sólo se permiten en modo de pruebas
+        // HTTP, file:// y hosts ajenos sólo en modo de pruebas
         // (MINEMOUNT_SERIES_API apunta a un servidor local).
         var testMode = !string.Equals(ApiBase, "https://api.github.com", StringComparison.OrdinalIgnoreCase);
-        if (!testMode && uri.Scheme != Uri.UriSchemeHttps)
+        if (!testMode)
         {
-            throw new InvalidOperationException("La URL del paquete debe ser HTTPS");
+            if (uri.Scheme != Uri.UriSchemeHttps)
+            {
+                throw new InvalidOperationException("La URL del paquete debe ser HTTPS");
+            }
+            if (!IsAllowedHost(uri.Host))
+            {
+                throw new InvalidOperationException($"Host de descarga no permitido: {uri.Host}");
+            }
         }
 
         // Timeout global de descarga: sin esto una conexión truncada

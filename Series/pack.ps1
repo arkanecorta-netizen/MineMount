@@ -78,7 +78,7 @@ Remove-Item $stageDir -Recurse -Force
 
 $zipHash = (Get-FileHash $zipPath -Algorithm SHA256).Hash
 $zipSize = (Get-Item $zipPath).Length
-$tag = "$($Id.ToLower())-v$Version"
+$tag = "$($Id.ToLowerInvariant())-v$Version"
 
 Write-Host ""
 Write-Host "Paquete creado: $zipPath" -ForegroundColor Green

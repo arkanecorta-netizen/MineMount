@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -88,24 +89,38 @@ public class SeriesInstallService : ISeriesInstallService
         {
             if (!SeriesValidation.IsValidSeriesId(id)) return false;
 
-            var dir = await _storageService.GetSeriesDirAsync(id);
-            var root = await _storageService.GetInstallRootAsync();
-            var fullDir = Path.GetFullPath(dir);
-            var fullRoot = Path.GetFullPath(root) + Path.DirectorySeparatorChar;
-
-            if (!fullDir.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+            // Mismo candado que instalación/actualización/reparación: sin él
+            // se podía borrar la carpeta mientras el pipeline escribía en ella.
+            var gate = _locks.GetOrAdd(id, static _ => new SemaphoreSlim(1, 1));
+            await gate.WaitAsync().ConfigureAwait(false);
+            try
             {
-                _logService.Warning($"Desinstalación bloqueada fuera de la raíz: {id}");
-                return false;
-            }
+                var dir = await _storageService.GetSeriesDirAsync(id);
+                var root = await _storageService.GetInstallRootAsync();
+                var fullDir = Path.GetFullPath(dir);
+                var fullRoot = Path.GetFullPath(root) + Path.DirectorySeparatorChar;
 
-            if (Directory.Exists(fullDir))
+                if (!fullDir.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logService.Warning($"Desinstalación bloqueada fuera de la raíz: {id}");
+                    return false;
+                }
+
+                if (Directory.Exists(fullDir))
+                {
+                    // Borrado recursivo fuera del hilo de UI (miles de mods
+                    // congelaban la ventana varios segundos).
+                    await Task.Run(() => Directory.Delete(fullDir, recursive: true))
+                        .ConfigureAwait(false);
+                    _logService.Info($"Serie {id} desinstalada ({fullDir})");
+                }
+
+                return true;
+            }
+            finally
             {
-                Directory.Delete(fullDir, recursive: true);
-                _logService.Info($"Serie {id} desinstalada ({fullDir})");
+                gate.Release();
             }
-
-            return true;
         }
         catch (Exception ex)
         {
@@ -279,8 +294,11 @@ public class SeriesInstallService : ISeriesInstallService
         // quedaba congelada varios segundos con paquetes de 30+ MB).
         report(2, 60, "Validando paquete...");
         var stageRoot = Path.Combine(_stageDir, definition.Id);
-        if (Directory.Exists(stageRoot)) Directory.Delete(stageRoot, recursive: true);
-        Directory.CreateDirectory(stageRoot);
+        await Task.Run(() =>
+        {
+            if (Directory.Exists(stageRoot)) Directory.Delete(stageRoot, recursive: true);
+            Directory.CreateDirectory(stageRoot);
+        }, cancellationToken);
 
         var lastExtractReport = DateTime.MinValue;
         var manifest = await Task.Run(() => ExtractAndVerify(zipPath, stageRoot, (done, total) =>
@@ -351,11 +369,21 @@ public class SeriesInstallService : ISeriesInstallService
         {
             await _storageService.SavePackageManifestAsync(seriesDir, manifest);
         }
+        else
+        {
+            // Paquete sin manifest.json: eliminar el de una versión anterior
+            // para que la UI no verifique una lista de archivos obsoleta.
+            await _storageService.RemovePackageManifestAsync(seriesDir);
+        }
 
         report(3, 100, "Completado");
 
-        TryDeleteDirectory(stageRoot);
-        TryCleanupOldPackages(definition.Id, definition.Version);
+        // Limpieza fuera del hilo de UI (staging puede tener miles de archivos)
+        await Task.Run(() =>
+        {
+            TryDeleteDirectory(stageRoot);
+            TryCleanupOldPackages(definition.Id, definition.Version);
+        }, cancellationToken);
 
         result.Success = true;
         result.Installed = copied;
@@ -526,6 +554,24 @@ public class SeriesInstallService : ISeriesInstallService
                     if (!string.Equals(actual, file.Sha256, StringComparison.OrdinalIgnoreCase))
                     {
                         throw new InvalidDataException($"Hash incorrecto en {file.Path}");
+                    }
+                }
+
+                // Archivos EXTRAÍDOS que el manifest NO lista: se copiaban al
+                // destino sin ninguna verificación (bypass de hash). Todo lo
+                // que se instala tiene que estar declarado.
+                var listed = new HashSet<string>(
+                    manifest.Files.Select(f => f.Path.Replace('\\', '/')),
+                    StringComparer.OrdinalIgnoreCase);
+
+                foreach (var staged in Directory.GetFiles(fullStage, "*", SearchOption.AllDirectories))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var rel = Path.GetRelativePath(fullStage, staged).Replace('\\', '/');
+                    if (string.Equals(rel, "manifest.json", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!listed.Contains(rel))
+                    {
+                        throw new InvalidDataException($"Archivo no listado en el manifest: {rel}");
                     }
                 }
             }

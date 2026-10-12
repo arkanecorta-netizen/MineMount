@@ -84,6 +84,7 @@
     <sys:String x:Key="S.Series.UninstallTitle">Desinstalar serie</sys:String>
     <sys:String x:Key="S.Series.UninstallMsg">¿Desinstalar {0}? Se borran sus archivos (el catálogo queda intacto).</sys:String>
     <sys:String x:Key="S.Series.Uninstalled">{0} desinstalada</sys:String>
+    <sys:String x:Key="S.Series.UninstallFailed">No se pudo desinstalar {0}</sys:String>
     <sys:String x:Key="S.Series.Changelog">Qué hay de nuevo en v{0}</sys:String>
     <sys:String x:Key="S.Series.MCLine">Minecraft {0} · {1} · v{2}</sys:String>
     <sys:String x:Key="S.Crash.Title">El juego se cerró</sys:String>

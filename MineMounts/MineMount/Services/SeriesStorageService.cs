@@ -17,6 +17,7 @@ public interface ISeriesStorageService
     Task SaveInstallationAsync(string seriesDir, SeriesInstallation installation);
     Task<SeriesPackageManifest?> ReadPackageManifestAsync(string seriesDir);
     Task SavePackageManifestAsync(string seriesDir, SeriesPackageManifest manifest);
+    Task RemovePackageManifestAsync(string seriesDir);
     Task<SeriesStatus> ComputeStatusAsync(SeriesDefinition definition, string seriesDir);
 }
 
@@ -88,20 +89,27 @@ public class SeriesStorageService : ISeriesStorageService
     {
         var path = InstallationPath(seriesDir);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(installation, JsonOptions));
+
+        // Escritura atómica: un corte de luz no deja installation.json
+        // truncado (leído como null → la serie aparecía "no instalada").
+        var tmp = path + ".tmp";
+        await File.WriteAllTextAsync(tmp, JsonSerializer.Serialize(installation, JsonOptions));
+        File.Move(tmp, path, overwrite: true);
     }
 
     public async Task<SeriesPackageManifest?> ReadPackageManifestAsync(string seriesDir)
     {
+        var path = ManifestPath(seriesDir);
+        if (!File.Exists(path)) return null;
         try
         {
-            var path = ManifestPath(seriesDir);
-            if (!File.Exists(path)) return null;
             var json = await File.ReadAllTextAsync(path);
             return JsonSerializer.Deserialize<SeriesPackageManifest>(json, JsonOptions);
         }
-        catch
+        catch (Exception ex)
         {
+            // Corrupto ≠ ausente: ComputeStatusAsync distingue ambos casos
+            _logService.Warning($"manifest.json ilegible de {seriesDir}: {ex.Message}");
             return null;
         }
     }
@@ -110,7 +118,23 @@ public class SeriesStorageService : ISeriesStorageService
     {
         var path = ManifestPath(seriesDir);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(manifest, JsonOptions));
+        var tmp = path + ".tmp";
+        await File.WriteAllTextAsync(tmp, JsonSerializer.Serialize(manifest, JsonOptions));
+        File.Move(tmp, path, overwrite: true);
+    }
+
+    public Task RemovePackageManifestAsync(string seriesDir)
+    {
+        try
+        {
+            var path = ManifestPath(seriesDir);
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning($"No se pudo eliminar manifest.json de {seriesDir}: {ex.Message}");
+        }
+        return Task.CompletedTask;
     }
 
     // ---------------------------------------------------------------
@@ -130,7 +154,11 @@ public class SeriesStorageService : ISeriesStorageService
             return SeriesStatus.UpdateAvailable;
         }
 
-        var manifest = await ReadPackageManifestAsync(seriesDir);
+        var manifestPath = ManifestPath(seriesDir);
+        var manifest = File.Exists(manifestPath)
+            ? await ReadPackageManifestAsync(seriesDir)
+            : null;
+
         if (manifest != null && manifest.Files.Count > 0)
         {
             var missing = manifest.Files.Any(f =>
@@ -149,6 +177,18 @@ public class SeriesStorageService : ISeriesStorageService
             });
 
             if (missing) return SeriesStatus.MissingFiles;
+        }
+        else if (manifest != null)
+        {
+            // Archivo presente pero vacío/inválido (Read devolvió null o sin
+            // archivos): antes caía a "Installed" y el botón Reparar no
+            // aparecía nunca.
+            return SeriesStatus.MissingFiles;
+        }
+        else if (File.Exists(manifestPath))
+        {
+            // manifest.json existe pero no se pudo parsear → corrupto
+            return SeriesStatus.MissingFiles;
         }
 
         return SeriesStatus.Installed;

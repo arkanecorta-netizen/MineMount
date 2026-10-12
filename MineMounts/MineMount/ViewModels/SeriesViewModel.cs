@@ -34,6 +34,14 @@ public partial class SeriesCard : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
+    /// <summary>
+    /// CTS de la operación en curso de ESTA tarjeta. Cada tarjeta tiene la
+    /// suya: con un CTS compartido, operar en una tarjeta cancelaba y
+    /// disposed la operación de otra (ObjectDisposedException / cancelación
+    /// cruzada).
+    /// </summary>
+    internal CancellationTokenSource? OpCts;
+
     public bool ShowChangelog => Info.Status == SeriesStatus.UpdateAvailable
         && !string.IsNullOrWhiteSpace(Info.Definition.Changelog);
 
@@ -54,7 +62,6 @@ public partial class SeriesViewModel : ObservableObject
 
     private string? _lastSelectedId;
     private int _lastCount = -1;
-    private CancellationTokenSource? _operationCts;
 
     /// <summary>Se dispara cuando una serie se lanza desde una tarjeta.</summary>
     public event Action<string>? GameLaunched;
@@ -212,6 +219,8 @@ public partial class SeriesViewModel : ObservableObject
         {
             var progress = new Progress<double>(p =>
             {
+                // Reportes en cola que llegan tras el finally: ignorar
+                if (!card.IsBusy) return;
                 card.Progress = p;
                 card.ProgressText = Loc.Tf("S.Play.StartingPct", p);
             });
@@ -234,6 +243,7 @@ public partial class SeriesViewModel : ObservableObject
         finally
         {
             card.IsBusy = false;
+            card.Progress = 0;
             card.ProgressText = string.Empty;
         }
     }
@@ -261,8 +271,11 @@ public partial class SeriesViewModel : ObservableObject
         if (card.IsBusy) return;
         SelectedCard = card;
 
-        _operationCts?.Cancel();
-        _operationCts = new CancellationTokenSource();
+        // CTS propio de esta tarjeta (ver SeriesCard.OpCts)
+        card.OpCts?.Cancel();
+        card.OpCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        card.OpCts = cts;
 
         card.IsBusy = true;
         card.Progress = 0;
@@ -271,15 +284,17 @@ public partial class SeriesViewModel : ObservableObject
         {
             var progress = new Progress<SeriesProgress>(p =>
             {
+                // Reportes en cola que llegan tras el finally: ignorar
+                if (!card.IsBusy) return;
                 card.Progress = p.Percent;
                 card.ProgressText = Loc.Tf("S.Play.Step", p.StepIndex, p.StepCount, p.StepName, p.Percent);
             });
 
             SeriesOperationResult result = op switch
             {
-                "update" => await _installService.UpdateAsync(card.Info.Id, progress, _operationCts.Token),
-                "repair" => await _installService.RepairAsync(card.Info.Id, progress, _operationCts.Token),
-                _ => await _installService.InstallAsync(card.Info.Id, progress, _operationCts.Token)
+                "update" => await _installService.UpdateAsync(card.Info.Id, progress, cts.Token),
+                "repair" => await _installService.RepairAsync(card.Info.Id, progress, cts.Token),
+                _ => await _installService.InstallAsync(card.Info.Id, progress, cts.Token)
             };
 
             if (result.Success)
@@ -299,9 +314,10 @@ public partial class SeriesViewModel : ObservableObject
         finally
         {
             card.IsBusy = false;
+            card.Progress = 0;
             card.ProgressText = string.Empty;
-            _operationCts?.Dispose();
-            _operationCts = null;
+            if (ReferenceEquals(card.OpCts, cts)) card.OpCts = null;
+            cts.Dispose();
         }
 
         await RefreshAsync();
@@ -326,7 +342,7 @@ public partial class SeriesViewModel : ObservableObject
     [RelayCommand]
     private async Task UninstallCardAsync(SeriesCard? card)
     {
-        if (card == null) return;
+        if (card == null || card.IsBusy) return;
 
         var answer = System.Windows.MessageBox.Show(
             Loc.Tf("S.Series.UninstallMsg", card.Info.Name),
@@ -335,16 +351,37 @@ public partial class SeriesViewModel : ObservableObject
             System.Windows.MessageBoxImage.Warning);
         if (answer != System.Windows.MessageBoxResult.Yes) return;
 
-        var ok = await _installService.UninstallAsync(card.Info.Id);
-        if (ok)
+        card.IsBusy = true;
+        card.Progress = 0;
+        card.ProgressText = Loc.T("S.Play.Preparing");
+        try
         {
-            _notificationService.NotifySuccess(
-                Loc.Tf("S.Series.Uninstalled", card.Info.Name), string.Empty);
+            var ok = await _installService.UninstallAsync(card.Info.Id);
+            if (ok)
+            {
+                _notificationService.NotifySuccess(
+                    Loc.Tf("S.Series.Uninstalled", card.Info.Name), string.Empty);
+            }
+            else
+            {
+                // Antes se mostraba "{0} desinstalada" también en el error
+                _notificationService.NotifyError(
+                    Loc.T("S.Common.Error"),
+                    Loc.Tf("S.Series.UninstallFailed", card.Info.Name));
+            }
         }
-        else
+        catch (Exception ex)
         {
+            _logService.Error("Uninstall failed", ex);
             _notificationService.NotifyError(
-                Loc.T("S.Common.Error"), Loc.Tf("S.Series.Uninstalled", card.Info.Name));
+                Loc.T("S.Common.Error"),
+                Loc.Tf("S.Series.UninstallFailed", card.Info.Name));
+        }
+        finally
+        {
+            card.IsBusy = false;
+            card.Progress = 0;
+            card.ProgressText = string.Empty;
         }
 
         await RefreshAsync();
