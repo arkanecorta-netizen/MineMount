@@ -55,8 +55,15 @@ public class ForgeInstallService : IForgeInstallService
     private readonly ILogService _logService;
     private readonly string _forgeDir;
 
-    // Forge 1.20.1 → 47.4.20 (requerido por nse6_world mod)
-    private const string ForgeVersion = "47.4.20";
+    // Pines conocidos por versión de MC (sin red). 1.20.1 → 47.4.20
+    // (requerido por nse6_world mod).
+    private static readonly IReadOnlyDictionary<string, string> KnownForgeVersions =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["1.20.1"] = "47.4.20"
+        };
+
+    private const string ForgeVersion = "47.4.20"; // fallback del pin 1.20.1
 
     public ForgeInstallService(ILogService logService)
     {
@@ -67,34 +74,149 @@ public class ForgeInstallService : IForgeInstallService
         Directory.CreateDirectory(_forgeDir);
     }
 
+    private string GamesRoot => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "MineMount", "Games", "ForgeMC");
+
+    // ---------------------------------------------------------------
+    //  Resolución de la versión de Forge por MC (antes: 47.4.20
+    //  hardcodeada para TODO mcVersion → 404 en cualquier otra MC).
+    // ---------------------------------------------------------------
+    private string ForgeVersionCachePath => Path.Combine(_forgeDir, "forge-versions.json");
+
+    private async Task<string> ResolveForgeVersionAsync(string mcVersion)
+    {
+        if (KnownForgeVersions.TryGetValue(mcVersion, out var known))
+        {
+            return known;
+        }
+
+        // Caché en disco de resoluciones ya hechas
+        try
+        {
+            if (File.Exists(ForgeVersionCachePath))
+            {
+                using var cache = JsonDocument.Parse(await File.ReadAllTextAsync(ForgeVersionCachePath));
+                if (cache.RootElement.TryGetProperty(mcVersion, out var cached)
+                    && cached.GetString() is string v && !string.IsNullOrWhiteSpace(v))
+                {
+                    return v;
+                }
+            }
+        }
+        catch
+        {
+            // Caché ilegible: se resuelve de nuevo
+        }
+
+        // promotions_slim.json de files.minecraftforge.net:
+        // { "promos": { "1.20.1-recommended": "47.4.20", ... } }
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var resp = await Http.GetAsync(
+                "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json",
+                cts.Token);
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync(cts.Token);
+
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("promos", out var promos))
+            {
+                var recommended = $"{mcVersion}-recommended";
+                var latest = $"{mcVersion}-latest";
+
+                var resolved = promos.TryGetProperty(recommended, out var r) ? r.GetString() : null;
+                if (string.IsNullOrWhiteSpace(resolved))
+                    resolved = promos.TryGetProperty(latest, out var l) ? l.GetString() : null;
+
+                if (!string.IsNullOrWhiteSpace(resolved))
+                {
+                    await CacheForgeVersionAsync(mcVersion, resolved);
+                    _logService.Info($"Forge para MC {mcVersion}: {resolved} (promotions)");
+                    return resolved;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning($"No se pudo resolver la versión de Forge para {mcVersion}: {ex.Message}");
+        }
+
+        throw new InvalidOperationException(
+            $"No hay una versión de Forge disponible para Minecraft {mcVersion}. " +
+            "Revisá que la serie defina una versión de Minecraft soportada.");
+    }
+
+    private async Task CacheForgeVersionAsync(string mcVersion, string forgeVersion)
+    {
+        try
+        {
+            var data = new Dictionary<string, string>();
+            if (File.Exists(ForgeVersionCachePath))
+            {
+                try
+                {
+                    using var existing = JsonDocument.Parse(await File.ReadAllTextAsync(ForgeVersionCachePath));
+                    foreach (var prop in existing.RootElement.EnumerateObject())
+                    {
+                        if (prop.Value.GetString() is string v) data[prop.Name] = v;
+                    }
+                }
+                catch
+                {
+                    // Caché corrupta: se reescribe
+                }
+            }
+
+            data[mcVersion] = forgeVersion;
+            var tmp = ForgeVersionCachePath + ".tmp";
+            await File.WriteAllTextAsync(tmp, JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true }));
+            File.Move(tmp, ForgeVersionCachePath, overwrite: true);
+        }
+        catch
+        {
+            // Caché best-effort: la resolución vuelve a funcionar sin ella
+        }
+    }
+
     public Task<bool> IsForgeInstalledAsync(string mcVersion)
     {
-        var jar = GetForgeJarPath(mcVersion);
-        var versionJson = FindForgeVersionJsonForVersion(
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "MineMount", "Games", "ForgeMC"), mcVersion, ForgeVersion);
-        return Task.FromResult(File.Exists(jar) && versionJson != null);
+        // Cualquier Forge instalado para esta MC sirve (glob), no solo el pin.
+        var jsonPath = FindForgeVersionJson(GamesRoot, mcVersion);
+        if (jsonPath == null) return Task.FromResult(false);
+
+        var fv = ExtractForgeVersion(Path.GetFileName(Path.GetDirectoryName(jsonPath)!), mcVersion);
+        var jar = GetForgeJarPath(mcVersion, fv);
+        return Task.FromResult(File.Exists(jar));
+    }
+
+    /// <summary>"1.20.1-forge-47.4.20" + mc "1.20.1" → "47.4.20".</summary>
+    private static string ExtractForgeVersion(string versionId, string mcVersion)
+    {
+        var prefix = mcVersion + "-forge-";
+        return versionId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? versionId[prefix.Length..]
+            : ForgeVersion;
     }
 
     public async Task InstallForgeAsync(string mcVersion, IProgress<double>? progress, CancellationToken cancellationToken)
     {
-        var jar = GetForgeJarPath(mcVersion);
-        var versionJson = FindForgeVersionJsonForVersion(
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "MineMount", "Games", "ForgeMC"), mcVersion, ForgeVersion);
-        
+        var fv = await ResolveForgeVersionAsync(mcVersion);
+
+        var jar = GetForgeJarPath(mcVersion, fv);
+        var versionJson = FindForgeVersionJsonForVersion(GamesRoot, mcVersion, fv);
+
         if (File.Exists(jar) && versionJson != null)
         {
             progress?.Report(100);
             return;
         }
 
-        var url = $"https://maven.minecraftforge.net/net/minecraftforge/forge/{mcVersion}-{ForgeVersion}/forge-{mcVersion}-{ForgeVersion}-universal.jar";
+        var url = $"https://maven.minecraftforge.net/net/minecraftforge/forge/{mcVersion}-{fv}/forge-{mcVersion}-{fv}-universal.jar";
 
         progress?.Report(10);
-        _logService.Info($"Descargando Forge {mcVersion}-{ForgeVersion}...");
+        _logService.Info($"Descargando Forge {mcVersion}-{fv}...");
 
         const int MaxAttempts = 3;
         var attempt = 0;
@@ -104,40 +226,14 @@ public class ForgeInstallService : IForgeInstallService
             attempt++;
             try
             {
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                cts.CancelAfter(TimeSpan.FromMinutes(10));
-
-                using (await DownloadLimiter.AcquireAsync(cts.Token))
-                {
-                    using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-                    resp.EnsureSuccessStatusCode();
-
-                    var total = resp.Content.Headers.ContentLength ?? -1;
-                    long received = 0;
-
-                    await using var source = await resp.Content.ReadAsStreamAsync(cts.Token);
-                    await using var target = File.Create(jar);
-
-                    var buffer = new byte[81920];
-                    int read;
-                    while ((read = await source.ReadAsync(buffer, cts.Token)) > 0)
-                    {
-                        await DownloadLimiter.ThrottleAsync(read, cts.Token);
-                        await target.WriteAsync(buffer.AsMemory(0, read), cts.Token);
-                        received += read;
-
-                        if (total > 0)
-                        {
-                            progress?.Report(10 + (received * 90.0 / total));
-                        }
-                    }
-                }
+                await DownloadVerifiedAsync(url, jar, progress,
+                    p => 10 + (p * 0.8), cancellationToken);
 
                 // Run Forge installer to create version.json and libraries
-                await RunForgeInstallerAsync(mcVersion, jar, progress, cancellationToken);
+                await RunForgeInstallerAsync(mcVersion, fv, jar, progress, cancellationToken);
 
                 progress?.Report(100);
-                _logService.Info($"Forge {mcVersion}-{ForgeVersion} instalado");
+                _logService.Info($"Forge {mcVersion}-{fv} instalado");
                 return;
             }
             catch (OperationCanceledException)
@@ -152,49 +248,117 @@ public class ForgeInstallService : IForgeInstallService
         }
     }
 
-    private async Task RunForgeInstallerAsync(string mcVersion, string universalJar, IProgress<double>? progress, CancellationToken cancellationToken)
+    /// <summary>
+    /// Descarga a .tmp + verificación SHA-1 (publicado en el maven) +
+    /// rename atómico: un jar parcial o corrupto jamás queda en destino.
+    /// </summary>
+    private async Task DownloadVerifiedAsync(
+        string url, string destPath, IProgress<double>? progress,
+        Func<double, double> mapProgress, CancellationToken cancellationToken)
     {
-        progress?.Report(90);
-
-        // OJO: el universal jar NO es ejecutable (sin Main-Class). Hay que
-        // descargar y correr el installer jar oficial.
-        var installerPath = Path.Combine(_forgeDir, $"forge-{mcVersion}-{ForgeVersion}-installer.jar");
-        if (!File.Exists(installerPath) || new FileInfo(installerPath).Length < 1024 * 1024)
+        var tmpPath = destPath + ".tmp";
+        try
         {
-            try { if (File.Exists(installerPath)) File.Delete(installerPath); } catch { /* reintento limpio */ }
+            // SHA-1 publicado por el maven (archivo .sha1 al lado del jar)
+            string? expectedSha1 = null;
+            try
+            {
+                using var shaCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                shaCts.CancelAfter(TimeSpan.FromSeconds(30));
+                var shaText = await Http.GetStringAsync(url + ".sha1", shaCts.Token);
+                var hex = shaText.Trim().Split(' ')[0];
+                if (hex.Length == 40) expectedSha1 = hex;
+            }
+            catch
+            {
+                _logService.Warning($"Sin SHA-1 publicado para {url}: se descarga igualmente");
+            }
 
-            var installerUrl = $"https://maven.minecraftforge.net/net/minecraftforge/forge/{mcVersion}-{ForgeVersion}/forge-{mcVersion}-{ForgeVersion}-installer.jar";
-            _logService.Info($"Descargando instalador de Forge {mcVersion}-{ForgeVersion}...");
             using (await DownloadLimiter.AcquireAsync(cancellationToken))
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                cts.CancelAfter(TimeSpan.FromMinutes(15));
-                using var resp = await Http.GetAsync(installerUrl, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                cts.CancelAfter(TimeSpan.FromMinutes(10));
+
+                using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
                 resp.EnsureSuccessStatusCode();
+
+                var total = resp.Content.Headers.ContentLength ?? -1;
+                long received = 0;
+
                 await using var source = await resp.Content.ReadAsStreamAsync(cts.Token);
-                await using var target = File.Create(installerPath);
+                await using var target = File.Create(tmpPath);
+
                 var buffer = new byte[81920];
                 int read;
                 while ((read = await source.ReadAsync(buffer, cts.Token)) > 0)
                 {
                     await DownloadLimiter.ThrottleAsync(read, cts.Token);
                     await target.WriteAsync(buffer.AsMemory(0, read), cts.Token);
+                    received += read;
+
+                    if (total > 0)
+                    {
+                        progress?.Report(mapProgress(received * 100.0 / total));
+                    }
                 }
             }
+
+            if (expectedSha1 != null)
+            {
+                using var sha = System.Security.Cryptography.SHA1.Create();
+                await using var fs = File.OpenRead(tmpPath);
+                var actual = Convert.ToHexString(await sha.ComputeHashAsync(fs, cancellationToken));
+                if (!string.Equals(actual, expectedSha1, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException($"SHA-1 de {Path.GetFileName(destPath)} no coincide");
+                }
+            }
+
+            File.Move(tmpPath, destPath, overwrite: true);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tmpPath)) File.Delete(tmpPath);
+            }
+            catch
+            {
+                // Temporal: lo limpia el servicio de temporales
+            }
+        }
+    }
+
+    private async Task RunForgeInstallerAsync(
+        string mcVersion, string forgeVersion, string universalJar,
+        IProgress<double>? progress, CancellationToken cancellationToken)
+    {
+        progress?.Report(90);
+
+        // OJO: el universal jar NO es ejecutable (sin Main-Class). Hay que
+        // descargar y correr el installer jar oficial.
+        var installerPath = Path.Combine(_forgeDir, $"forge-{mcVersion}-{forgeVersion}-installer.jar");
+        if (!File.Exists(installerPath) || new FileInfo(installerPath).Length < 1024 * 1024)
+        {
+            try { if (File.Exists(installerPath)) File.Delete(installerPath); } catch { /* reintento limpio */ }
+
+            var installerUrl = $"https://maven.minecraftforge.net/net/minecraftforge/forge/{mcVersion}-{forgeVersion}/forge-{mcVersion}-{forgeVersion}-installer.jar";
+            _logService.Info($"Descargando instalador de Forge {mcVersion}-{forgeVersion}...");
+
+            await DownloadVerifiedAsync(installerUrl, installerPath, progress,
+                p => 70 + (p * 0.2), cancellationToken);
 
             if (new FileInfo(installerPath).Length < 1024 * 1024)
                 throw new InvalidOperationException("El instalador de Forge descargado está incompleto");
         }
 
-        _logService.Info($"Ejecutando instalador de Forge {mcVersion}-{ForgeVersion}...");
+        _logService.Info($"Ejecutando instalador de Forge {mcVersion}-{forgeVersion}...");
 
         var java = await FindJavaForInstallerAsync(cancellationToken);
         if (java == null)
             throw new InvalidOperationException("No se encontró Java para ejecutar el instalador de Forge");
 
-        var targetDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MineMount", "Games", "ForgeMC");
+        var targetDir = GamesRoot;
 
         Directory.CreateDirectory(targetDir);
 
@@ -218,16 +382,44 @@ public class ForgeInstallService : IForgeInstallService
             if (process == null)
                 throw new InvalidOperationException("No se pudo iniciar el instalador de Forge");
 
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
-
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(TimeSpan.FromMinutes(15));
-            await process.WaitForExitAsync(cts.Token);
+
+            // AMBOS streams en paralelo ANTES de esperar: leerlos en serie
+            // provocaba deadlock clásico de pipes (stderr lleno → stdout
+            // nunca cierra → espera infinita con la UI en "Instalando Forge").
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Matar el instalador colgado (no dejar procesos zombi)
+                try
+                {
+                    if (!process.HasExited) process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                    // Ya salió
+                }
+
+                try { await Task.WhenAll(outputTask, errorTask); } catch { /* abortado */ }
+                throw;
+            }
+
+            var output = await outputTask;
+            var error = await errorTask;
 
             if (process.ExitCode != 0)
             {
                 _logService.Error($"Forge installer falló (exit {process.ExitCode}): {error}\n{output}");
+                // Instalador corrupto ≥1MB no se re-descarga solo: borrarlo
+                // para que el próximo intento lo vuelva a bajar.
+                try { File.Delete(installerPath); } catch { /* best effort */ }
                 throw new InvalidOperationException($"Forge installer falló (exit {process.ExitCode}). Revisá tu conexión e intentá de nuevo.");
             }
 
@@ -235,9 +427,9 @@ public class ForgeInstallService : IForgeInstallService
 
             // El instalador crea el version.json + librerías, pero no el jar
             // de la versión: se usa el universal jar como client jar.
-            var versionDir = Path.Combine(targetDir, "versions", $"{mcVersion}-forge-{ForgeVersion}");
+            var versionDir = Path.Combine(targetDir, "versions", $"{mcVersion}-forge-{forgeVersion}");
             Directory.CreateDirectory(versionDir);
-            var targetJar = Path.Combine(versionDir, $"{mcVersion}-forge-{ForgeVersion}.jar");
+            var targetJar = Path.Combine(versionDir, $"{mcVersion}-forge-{forgeVersion}.jar");
             if (!File.Exists(targetJar))
             {
                 File.Copy(universalJar, targetJar, overwrite: true);
@@ -297,6 +489,8 @@ public class ForgeInstallService : IForgeInstallService
 
         foreach (var candidate in candidates)
         {
+            Process? p = null;
+            Task<string>? outputTask = null;
             try
             {
                 var psi = new ProcessStartInfo
@@ -307,12 +501,15 @@ public class ForgeInstallService : IForgeInstallService
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
-                using var p = Process.Start(psi);
+                p = Process.Start(psi);
                 if (p == null) continue;
+
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(TimeSpan.FromSeconds(5));
-                var output = await p.StandardError.ReadToEndAsync();
+                outputTask = p.StandardError.ReadToEndAsync();
                 await p.WaitForExitAsync(cts.Token);
+                var output = await outputTask;
+                outputTask = null;
 
                 var match = System.Text.RegularExpressions.Regex.Match(output, @"version ""(\d+)");
                 if (match.Success && int.TryParse(match.Groups[1].Value, out var major) && major >= 17)
@@ -324,7 +521,24 @@ public class ForgeInstallService : IForgeInstallService
             }
             catch
             {
-                // Ignorar y probar siguiente
+                // Timeout o probe inválido: matar y probar siguiente
+                try
+                {
+                    if (p is { HasExited: false }) p.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                    // Ya salió
+                }
+
+                if (outputTask is not null)
+                {
+                    try { await outputTask; } catch { /* abortado */ }
+                }
+            }
+            finally
+            {
+                p?.Dispose();
             }
         }
         return null;
@@ -333,8 +547,24 @@ public class ForgeInstallService : IForgeInstallService
     public Task<string> GetForgeJarPathAsync(string mcVersion)
         => Task.FromResult(GetForgeJarPath(mcVersion));
 
+    private string GetForgeJarPath(string mcVersion, string forgeVersion)
+        => Path.Combine(_forgeDir, $"forge-{mcVersion}-{forgeVersion}-universal.jar");
+
+    /// <summary>
+    /// Ruta del universal jar para la serie clásica: usa el Forge realmente
+    /// instalado (glob) y solo cae al pin 1.20.1 si no hay nada instalado.
+    /// </summary>
     private string GetForgeJarPath(string mcVersion)
-        => Path.Combine(_forgeDir, $"forge-{mcVersion}-{ForgeVersion}-universal.jar");
+    {
+        var jsonPath = FindForgeVersionJson(GamesRoot, mcVersion);
+        if (jsonPath != null)
+        {
+            var versionId = Path.GetFileName(Path.GetDirectoryName(jsonPath)!);
+            return GetForgeJarPath(mcVersion, ExtractForgeVersion(versionId, mcVersion));
+        }
+
+        return GetForgeJarPath(mcVersion, KnownForgeVersions.TryGetValue(mcVersion, out var v) ? v : ForgeVersion);
+    }
 
     // ---------------------------------------------------------------
     //  Lanzamiento moderno (BootstrapLauncher, Forge >= 1.17):
@@ -357,16 +587,14 @@ public class ForgeInstallService : IForgeInstallService
     {
         try
         {
-            // 1. Layout estándar bajo el gameDir de la serie.
-            var jsonPath = FindForgeVersionJsonForVersion(gameDir, mcVersion, ForgeVersion);
+            // 1. Layout estándar bajo el gameDir de la serie (cualquier
+            //    versión de Forge instalada para esta MC, no solo el pin).
+            var jsonPath = FindForgeVersionJson(gameDir, mcVersion);
 
             // 2. Instalación oficial reutilizable (la crea el instalador de Forge).
             if (jsonPath == null)
             {
-                var shared = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "MineMount", "Games", "ForgeMC");
-                jsonPath = FindForgeVersionJsonForVersion(shared, mcVersion, ForgeVersion);
+                jsonPath = FindForgeVersionJson(GamesRoot, mcVersion);
             }
 
             if (jsonPath == null) return null;
@@ -395,7 +623,11 @@ public class ForgeInstallService : IForgeInstallService
                         continue;
 
                     if (IsModulePathLibrary(n)) continue;
-                    var rel = MavenNameToRelativePath(n);
+
+                    // downloads.artifact.path es la fuente de verdad (incluye
+                    // classifier, p.ej. mergetool-1.1.5-api.jar); parsear el
+                    // nombre Maven perdía el classifier y daba 404/ruta mal.
+                    var rel = GetLibraryRelativePath(lib, n);
                     if (rel != null)
                         classpath.Add(Path.Combine(librariesDir, rel));
                 }
@@ -446,8 +678,8 @@ public class ForgeInstallService : IForgeInstallService
         // Obtener librerías de module-path del version.json
         var jsonPath = Path.Combine(data.LibrariesDir, "..", "versions", data.VersionId, data.VersionId + ".json");
         jsonPath = Path.GetFullPath(jsonPath);
-        var moduleLibs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        
+        var moduleLibRels = new List<string>();
+
         if (File.Exists(jsonPath))
         {
             try
@@ -462,7 +694,8 @@ public class ForgeInstallService : IForgeInstallService
                             nameProp.GetString() is string n && !string.IsNullOrWhiteSpace(n) &&
                             IsModulePathLibrary(n))
                         {
-                            moduleLibs.Add(n);
+                            var rel = GetLibraryRelativePath(lib, n);
+                            if (rel != null) moduleLibRels.Add(rel);
                         }
                     }
                 }
@@ -471,11 +704,9 @@ public class ForgeInstallService : IForgeInstallService
         }
 
         var allLibPaths = new List<string>(data.ClasspathLibraries);
-        foreach (var name in moduleLibs)
+        foreach (var rel in moduleLibRels)
         {
-            var rel = MavenNameToRelativePath(name);
-            if (rel != null)
-                allLibPaths.Add(Path.Combine(data.LibrariesDir, rel));
+            allLibPaths.Add(Path.Combine(data.LibrariesDir, rel));
         }
 
         var missing = allLibPaths
@@ -501,34 +732,49 @@ public class ForgeInstallService : IForgeInstallService
             };
 
             Exception? lastError = null;
-            foreach (var url in tried)
+            var completed = false;
+            try
             {
-                try
+                foreach (var url in tried)
                 {
-                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    cts.CancelAfter(TimeSpan.FromMinutes(5));
-                    using (await DownloadLimiter.AcquireAsync(cts.Token))
+                    try
                     {
-                        using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-                        resp.EnsureSuccessStatusCode();
-                        await using var source = await resp.Content.ReadAsStreamAsync(cts.Token);
-                        await using var target = File.Create(dest);
-                        var buffer = new byte[81920];
-                        int read;
-                        while ((read = await source.ReadAsync(buffer, cts.Token)) > 0)
+                        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        cts.CancelAfter(TimeSpan.FromMinutes(5));
+                        using (await DownloadLimiter.AcquireAsync(cts.Token))
                         {
-                            await DownloadLimiter.ThrottleAsync(read, cts.Token);
-                            await target.WriteAsync(buffer.AsMemory(0, read), cts.Token);
+                            using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                            resp.EnsureSuccessStatusCode();
+                            await using var source = await resp.Content.ReadAsStreamAsync(cts.Token);
+                            await using var target = File.Create(dest);
+                            var buffer = new byte[81920];
+                            int read;
+                            while ((read = await source.ReadAsync(buffer, cts.Token)) > 0)
+                            {
+                                await DownloadLimiter.ThrottleAsync(read, cts.Token);
+                                await target.WriteAsync(buffer.AsMemory(0, read), cts.Token);
+                            }
                         }
+                        lastError = null;
+                        completed = true;
+                        break;
                     }
-                    lastError = null;
-                    break;
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        lastError = ex;
+                        try { if (File.Exists(dest)) File.Delete(dest); } catch { /* reintento limpio */ }
+                    }
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+            }
+            finally
+            {
+                // También en la ruta de cancelación (timeout del CTS):
+                // antes un .jar a medias quedaba en el classpath para
+                // siempre y FML crasheaba al arrancar.
+                if (!completed)
                 {
-                    lastError = ex;
-                    try { if (File.Exists(dest)) File.Delete(dest); } catch { /* reintento limpio */ }
+                    try { if (File.Exists(dest)) File.Delete(dest); } catch { /* best effort */ }
                 }
             }
 
@@ -598,6 +844,37 @@ public class ForgeInstallService : IForgeInstallService
         var groupPath = parts[0].Replace('.', Path.DirectorySeparatorChar);
         var artifact = parts[1];
         var version = parts[2];
-        return Path.Combine(groupPath, artifact, version, $"{artifact}-{version}.jar");
+        // classifier (4ª parte) → artifact-version-classifier.jar
+        var classifier = parts.Length >= 4 && !string.IsNullOrWhiteSpace(parts[3]) ? parts[3] : null;
+        var fileName = classifier != null
+            ? $"{artifact}-{version}-{classifier}.jar"
+            : $"{artifact}-{version}.jar";
+        return Path.Combine(groupPath, artifact, version, fileName);
+    }
+
+    /// <summary>
+    /// Ruta relativa de una librería: prefiere downloads.artifact.path del
+    /// version.json (fuente de verdad, con classifier) y cae al parseo del
+    /// nombre Maven.
+    /// </summary>
+    private static string? GetLibraryRelativePath(JsonElement lib, string name)
+    {
+        try
+        {
+            if (lib.TryGetProperty("downloads", out var downloads)
+                && downloads.TryGetProperty("artifact", out var artifact)
+                && artifact.TryGetProperty("path", out var pathProp)
+                && pathProp.GetString() is string path
+                && !string.IsNullOrWhiteSpace(path))
+            {
+                return path.Replace('/', Path.DirectorySeparatorChar);
+            }
+        }
+        catch
+        {
+            // JSON raro: fallback al nombre Maven
+        }
+
+        return MavenNameToRelativePath(name);
     }
 }

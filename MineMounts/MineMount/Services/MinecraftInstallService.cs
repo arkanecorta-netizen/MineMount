@@ -98,25 +98,41 @@ public class MinecraftInstallService : IMinecraftInstallService
     // ---------------------------------------------------------------
     public async Task<MinecraftVersionJson?> GetVersionAsync(string versionId)
     {
-        try
+        var jsonPath = Path.Combine(VersionDir(versionId), "version.json");
+
+        if (File.Exists(jsonPath))
         {
-            var jsonPath = Path.Combine(VersionDir(versionId), "version.json");
-            if (File.Exists(jsonPath))
+            try
             {
                 var json = await File.ReadAllTextAsync(jsonPath);
                 return JsonSerializer.Deserialize<MinecraftVersionJson>(json, JsonOptions);
             }
+            catch (Exception ex)
+            {
+                // Caché corrupta: borrar y re-descargar (antes quedaba
+                // clavada: cada intento leía el mismo JSON inválido).
+                _logService.Warning($"version.json de {versionId} ilegible ({ex.Message}); se re-descarga");
+                try { File.Delete(jsonPath); } catch { /* best effort */ }
+            }
+        }
 
+        try
+        {
             var manifest = await FetchVersionManifestAsync();
             var entry = manifest?.FirstOrDefault(v => string.Equals(v.Id, versionId, StringComparison.OrdinalIgnoreCase));
             if (entry == null) return null;
 
-            using var resp = await Http.GetAsync(entry.Url, HttpCompletionOption.ResponseHeadersRead);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            using var resp = await Http.GetAsync(entry.Url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
             resp.EnsureSuccessStatusCode();
-            var versionJson = await resp.Content.ReadAsStringAsync();
+            var versionJson = await resp.Content.ReadAsStringAsync(cts.Token);
 
             Directory.CreateDirectory(VersionDir(versionId));
-            await File.WriteAllTextAsync(jsonPath, versionJson);
+
+            // Escritura atómica: un corte no deja un version.json truncado.
+            var tmp = jsonPath + ".tmp";
+            await File.WriteAllTextAsync(tmp, versionJson, cts.Token);
+            File.Move(tmp, jsonPath, overwrite: true);
 
             return JsonSerializer.Deserialize<MinecraftVersionJson>(versionJson, JsonOptions);
         }
@@ -131,12 +147,13 @@ public class MinecraftInstallService : IMinecraftInstallService
     {
         try
         {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             using var req = new HttpRequestMessage(HttpMethod.Get,
                 "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
             req.Headers.UserAgent.ParseAdd("MineMount-Launcher/1.0");
-            using var resp = await Http.SendAsync(req);
+            using var resp = await Http.SendAsync(req, cts.Token);
             resp.EnsureSuccessStatusCode();
-            var json = await resp.Content.ReadAsStringAsync();
+            var json = await resp.Content.ReadAsStringAsync(cts.Token);
             using var doc = JsonDocument.Parse(json);
             var list = new List<VersionManifestEntry>();
             if (doc.RootElement.TryGetProperty("versions", out var versions))
@@ -246,7 +263,8 @@ public class MinecraftInstallService : IMinecraftInstallService
         var clientJar = Path.Combine(dir, "client.jar");
         if (!File.Exists(clientJar))
         {
-            await DownloadFileAsync(version.Downloads!.Client!.Url, clientJar, cancellationToken);
+            await DownloadFileAsync(version.Downloads!.Client!.Url, clientJar, cancellationToken,
+                version.Downloads.Client.Sha1, version.Downloads.Client.Size);
         }
         progress?.Report(5);
 
@@ -264,7 +282,8 @@ public class MinecraftInstallService : IMinecraftInstallService
             if (!File.Exists(libPath))
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(libPath)!);
-                await DownloadFileAsync(artifact.Url, libPath, cancellationToken);
+                await DownloadFileAsync(artifact.Url, libPath, cancellationToken,
+                    artifact.Sha1, artifact.Size);
             }
 
             libDone++;
@@ -279,7 +298,7 @@ public class MinecraftInstallService : IMinecraftInstallService
         foreach (var lib in nativeLibs)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var nativeKey = lib.Natives!.GetValueOrDefault("windows") ?? lib.Natives!.GetValueOrDefault("windows-64");
+            var nativeKey = ResolveNativeKey(lib);
             if (nativeKey == null || !lib.Downloads!.Classifiers!.TryGetValue(nativeKey, out var native))
             {
                 nativeDone++;
@@ -289,11 +308,32 @@ public class MinecraftInstallService : IMinecraftInstallService
             var nativeJar = Path.Combine(nativesDir, Path.GetFileName(native.Path.Replace('/', Path.DirectorySeparatorChar)));
             if (!File.Exists(nativeJar))
             {
-                await DownloadFileAsync(native.Url, nativeJar, cancellationToken);
+                await DownloadFileAsync(native.Url, nativeJar, cancellationToken,
+                    native.Sha1, native.Size);
             }
 
-            // Extraer natives
-            ExtractNatives(nativeJar, nativesDir, cancellationToken);
+            // Extraer natives; si el jar está corrupto o bloqueado, se
+            // re-descarga una vez y si aún falla se continúa (natives en
+            // 1.19.3+ van en el classpath y muchos launchers lo ignoran).
+            try
+            {
+                ExtractNatives(nativeJar, nativesDir, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logService.Warning($"Natives de {lib.Name} no se pudieron extraer ({ex.Message}); re-descarga");
+                try { File.Delete(nativeJar); } catch { /* best effort */ }
+                try
+                {
+                    await DownloadFileAsync(native.Url, nativeJar, cancellationToken,
+                        native.Sha1, native.Size);
+                    ExtractNatives(nativeJar, nativesDir, cancellationToken);
+                }
+                catch (Exception ex2)
+                {
+                    _logService.Warning($"Natives de {lib.Name} omitidos: {ex2.Message}");
+                }
+            }
 
             nativeDone++;
             progress?.Report(40 + (nativeDone * 10.0 / Math.Max(1, nativeLibs.Count)));
@@ -316,10 +356,11 @@ public class MinecraftInstallService : IMinecraftInstallService
         var indexId = version.AssetIndex?.Id ?? "5";
         var indexFile = Path.Combine(indexDir, $"{indexId}.json");
 
-        // Asset index
+        // Asset index (SHA-1 de Mojang sobre la descarga)
         if (!File.Exists(indexFile))
         {
-            await DownloadFileAsync(version.AssetIndex!.Url, indexFile, cancellationToken);
+            await DownloadFileAsync(version.AssetIndex!.Url, indexFile, cancellationToken,
+                version.AssetIndex.Sha1, version.AssetIndex.Size);
         }
 
         var indexJson = await File.ReadAllTextAsync(indexFile);
@@ -371,7 +412,9 @@ public class MinecraftInstallService : IMinecraftInstallService
                 {
                     Directory.CreateDirectory(destDir);
                     var url = $"https://resources.download.minecraft.net/{prefix}/{asset.Hash}";
-                    await DownloadFileAsync(url, dest, cancellationToken);
+                    // hash del índice = SHA-1 del objeto de Mojang
+                    await DownloadFileAsync(url, dest, cancellationToken,
+                        asset.Hash, asset.Size);
                 }
 
                 lock (lockObj)
@@ -386,11 +429,11 @@ public class MinecraftInstallService : IMinecraftInstallService
             }
             catch (Exception ex)
             {
+                // Fallaron 3 intentos: abortar la instalación (un asset
+                // ausente rompe el juego y una instalación "exitosa" con
+                // huecos solo retrasaba el error al primer arranque).
                 _logService.Warning($"No se pudo descargar el asset {asset.Hash}: {ex.Message}");
-                lock (lockObj)
-                {
-                    downloaded++;
-                }
+                throw;
             }
             finally
             {
@@ -429,10 +472,41 @@ public class MinecraftInstallService : IMinecraftInstallService
         }
     }
 
+    /// <summary>
+    /// Clave de classifier nativa de Windows con ${arch} sustituido.
+    /// Los version.json antiguos usan "windows" → "natives-windows-${arch}"
+    /// (literal), lo que daba null y se instalaban sin natives.
+    /// </summary>
+    private static string? ResolveNativeKey(VersionLibrary lib)
+    {
+        var arch = Environment.Is64BitOperatingSystem ? "64" : "32";
+        var key = lib.Natives!.GetValueOrDefault("windows")
+                  ?? lib.Natives!.GetValueOrDefault("windows-64")
+                  ?? lib.Natives!.GetValueOrDefault($"windows-{arch}");
+        if (key != null)
+        {
+            key = key.Replace("${arch}", arch);
+            if (lib.Downloads!.Classifiers!.ContainsKey(key)) return key;
+        }
+
+        foreach (var candidate in new[]
+                 {
+                     $"natives-windows-{arch}", "natives-windows-64", "natives-windows"
+                 })
+        {
+            if (lib.Downloads!.Classifiers!.ContainsKey(candidate)) return candidate;
+        }
+
+        return key;
+    }
+
     // ---------------------------------------------------------------
-    //  Descarga con reintentos
+    //  Descarga con reintentos, verificación de SHA-1 y escritura
+    //  atómica (.tmp + rename): un corte nunca deja un archivo
+    //  trunco en el disco que "pase" la verificación de existencia.
     // ---------------------------------------------------------------
-    private async Task DownloadFileAsync(string url, string destPath, CancellationToken cancellationToken)
+    private async Task DownloadFileAsync(string url, string destPath, CancellationToken cancellationToken,
+        string? expectedSha1 = null, long expectedSize = 0)
     {
         const int MaxAttempts = 3;
         var attempt = 0;
@@ -440,6 +514,7 @@ public class MinecraftInstallService : IMinecraftInstallService
         while (true)
         {
             attempt++;
+            var tmpPath = destPath + ".tmp";
             try
             {
                 var dir = Path.GetDirectoryName(destPath);
@@ -454,27 +529,54 @@ public class MinecraftInstallService : IMinecraftInstallService
                     resp.EnsureSuccessStatusCode();
 
                     await using var source = await resp.Content.ReadAsStreamAsync(cts.Token);
-                    await using var target = File.Create(destPath);
-
-                    var buffer = new byte[81920];
-                    int read;
-                    while ((read = await source.ReadAsync(buffer, cts.Token)) > 0)
+                    await using (var target = File.Create(tmpPath))
                     {
-                        await DownloadLimiter.ThrottleAsync(read, cts.Token);
-                        await target.WriteAsync(buffer.AsMemory(0, read), cts.Token);
+                        var buffer = new byte[81920];
+                        int read;
+                        while ((read = await source.ReadAsync(buffer, cts.Token)) > 0)
+                        {
+                            await DownloadLimiter.ThrottleAsync(read, cts.Token);
+                            await target.WriteAsync(buffer.AsMemory(0, read), cts.Token);
+                        }
                     }
                 }
 
+                if (expectedSize > 0 && new FileInfo(tmpPath).Length != expectedSize)
+                    throw new InvalidDataException(
+                        $"Tamaño incorrecto para {Path.GetFileName(destPath)}: " +
+                        $"{new FileInfo(tmpPath).Length} != {expectedSize}");
+
+                if (!string.IsNullOrEmpty(expectedSha1))
+                {
+                    string actualSha1;
+                    await using (var fs = File.OpenRead(tmpPath))
+                    {
+                        actualSha1 = Convert.ToHexString(
+                            await SHA1.HashDataAsync(fs, cts.Token));
+                    }
+                    if (!string.Equals(actualSha1, expectedSha1, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException(
+                            $"SHA-1 incorrecto para {Path.GetFileName(destPath)}");
+                }
+
+                File.Move(tmpPath, destPath, overwrite: true);
                 return;
             }
             catch (OperationCanceledException)
             {
+                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { /* best effort */ }
                 throw;
             }
             catch (Exception ex) when (attempt < MaxAttempts)
             {
+                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { /* best effort */ }
                 _logService.Warning($"Descarga falló (intento {attempt}/{MaxAttempts}): {ex.Message}");
                 await Task.Delay(TimeSpan.FromSeconds(attempt), cancellationToken);
+            }
+            catch (Exception)
+            {
+                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { /* best effort */ }
+                throw;
             }
         }
     }
@@ -556,6 +658,8 @@ public class VersionAssetIndex
 {
     public string Id { get; set; } = string.Empty;
     public string Url { get; set; } = string.Empty;
+    public string Sha1 { get; set; } = string.Empty;
+    public long Size { get; set; }
 }
 
 public class VersionLibrary
