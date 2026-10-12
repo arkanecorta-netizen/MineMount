@@ -14,6 +14,10 @@ public interface ILogService
 
 public class LogService : ILogService
 {
+    // Rotación al superar ~8 MB: sin esto minemount.log crecía sin límite
+    // (un error en bucle lo llenaba de gigas y bloqueaba el disco).
+    private const long MaxLogBytes = 8L * 1024 * 1024;
+
     private readonly string _logPath;
     private readonly object _lock = new();
 
@@ -23,6 +27,7 @@ public class LogService : ILogService
         var mineMountDir = Path.Combine(appData, "MineMount");
         Directory.CreateDirectory(mineMountDir);
         _logPath = Path.Combine(mineMountDir, "minemount.log");
+        TryRotate();
     }
 
     public void Info(string message) => WriteLog("INFO", message);
@@ -38,8 +43,26 @@ public class LogService : ILogService
     {
         lock (_lock)
         {
+            TryRotate();
             var logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{level}] {message}";
             File.AppendAllText(_logPath, logEntry + Environment.NewLine);
+        }
+    }
+
+    private void TryRotate()
+    {
+        try
+        {
+            var info = new FileInfo(_logPath);
+            if (!info.Exists || info.Length < MaxLogBytes) return;
+
+            var old = _logPath + ".old";
+            if (File.Exists(old)) File.Delete(old);
+            File.Move(_logPath, old);
+        }
+        catch
+        {
+            // Rotación best-effort: jamás debe romper el logging
         }
     }
 }

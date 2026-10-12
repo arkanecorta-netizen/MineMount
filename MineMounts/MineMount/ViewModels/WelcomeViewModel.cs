@@ -154,7 +154,7 @@ public partial class WelcomeViewModel : ObservableObject
             return;
         }
 
-        var session = await _authService.LoginMicrosoftAsync(tokens, profile);
+        var session = await _authService.LoginMicrosoftAsync(tokens, profile, mcToken);
         if (session != null) Done.TrySetResult(session);
         else MicrosoftError = Loc.T("S.Welcome.MSError");
     }

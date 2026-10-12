@@ -685,14 +685,13 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void OpenSeriesFolder()
+    private async Task OpenSeriesFolderAsync()
     {
         try
         {
-            var task = _seriesService.GetInstallRootAsync();
-            task.Wait(TimeSpan.FromSeconds(10));
-            Directory.CreateDirectory(task.Result);
-            Process.Start(new ProcessStartInfo(task.Result) { UseShellExecute = true });
+            var root = await _seriesService.GetInstallRootAsync();
+            Directory.CreateDirectory(root);
+            Process.Start(new ProcessStartInfo(root) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
@@ -722,24 +721,30 @@ public partial class SettingsViewModel : ObservableObject
             var source = await _seriesService.GetInstallRootAsync();
             var dest = Path.Combine(dialog.FolderName, "Series");
 
-            var files = Directory.GetFiles(source, "*", SearchOption.AllDirectories);
-            long bytes = 0;
-            foreach (var file in files)
+            // Copia + verificación + borrado en threadpool: con gigas de mods
+            // el bucle congelaba la ventana entera (era código síncrono en
+            // el hilo de UI).
+            await Task.Run(() =>
             {
-                var relative = Path.GetRelativePath(source, file);
-                var target = Path.Combine(dest, relative);
-                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                File.Copy(file, target, overwrite: true);
-                bytes += new FileInfo(target).Length;
-            }
+                var files = Directory.GetFiles(source, "*", SearchOption.AllDirectories);
+                long bytes = 0;
+                foreach (var file in files)
+                {
+                    var relative = Path.GetRelativePath(source, file);
+                    var target = Path.Combine(dest, relative);
+                    Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                    File.Copy(file, target, overwrite: true);
+                    bytes += new FileInfo(target).Length;
+                }
 
-            // Verificar: misma cantidad de archivos y bytes
-            var copied = Directory.GetFiles(dest, "*", SearchOption.AllDirectories);
-            long copiedBytes = copied.Sum(f => new FileInfo(f).Length);
-            if (copied.Length != files.Length || copiedBytes != bytes)
-                throw new IOException("La verificación falló: faltan archivos.");
+                // Verificar: misma cantidad de archivos y bytes
+                var copied = Directory.GetFiles(dest, "*", SearchOption.AllDirectories);
+                long copiedBytes = copied.Sum(f => new FileInfo(f).Length);
+                if (copied.Length != files.Length || copiedBytes != bytes)
+                    throw new IOException("La verificación falló: faltan archivos.");
 
-            Directory.Delete(source, recursive: true);
+                Directory.Delete(source, recursive: true);
+            });
 
             SeriesInstallPath = dest;
             await SaveAllAsync();

@@ -38,7 +38,7 @@ public interface IAuthService
     event EventHandler? SessionChanged;
     Task<bool> TryRestoreAsync();
     Task<GameSession> LoginOfflineAsync(string name);
-    Task<GameSession?> LoginMicrosoftAsync(MsaTokens tokens, MinecraftProfile profile);
+    Task<GameSession?> LoginMicrosoftAsync(MsaTokens tokens, MinecraftProfile profile, string? mcToken = null);
     Task RefreshIfNeededAsync();
     Task LogoutAsync();
     static bool IsValidOfflineName(string? name)
@@ -147,7 +147,7 @@ public class AuthService : IAuthService
         return session;
     }
 
-    public async Task<GameSession?> LoginMicrosoftAsync(MsaTokens tokens, MinecraftProfile profile)
+    public async Task<GameSession?> LoginMicrosoftAsync(MsaTokens tokens, MinecraftProfile profile, string? mcToken = null)
     {
         if (string.IsNullOrWhiteSpace(profile.Name) || string.IsNullOrWhiteSpace(profile.Id))
             return null;
@@ -157,9 +157,12 @@ public class AuthService : IAuthService
             Kind = AccountKind.Microsoft,
             Name = profile.Name,
             Uuid = profile.Id.Replace("-", ""),
-            AccessToken = string.Empty, // el token MC se pide al jugar
+            // El token de Minecraft ya se obtuvo en el flujo de login: si se
+            // descartaba, el primer lanzamiento iba con accessToken vacío y
+            // el juego arrancaba rechazado (o con "0").
+            AccessToken = string.IsNullOrWhiteSpace(mcToken) ? string.Empty : mcToken,
             UserType = "msa",
-            ExpiresAtUtc = DateTimeOffset.UtcNow
+            ExpiresAtUtc = tokens.ExpiresAtUtc
         };
 
         Directory.CreateDirectory(AuthDir);

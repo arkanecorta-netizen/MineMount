@@ -560,6 +560,19 @@ public class GameLauncherService : IGameLauncherService
                 return result;
             }
 
+            // Renovar el token Microsoft ANTES de armar la config: sin esto
+            // se lanzaba con accessToken vacío/"0" (restauración de sesión
+            // sólo dispara el refresh en background y no se esperaba).
+            try
+            {
+                if (_authService.CurrentSession?.Kind == AccountKind.Microsoft)
+                    await _authService.RefreshIfNeededAsync();
+            }
+            catch (Exception ex)
+            {
+                _logService.Warning($"Refresh de token previo al lanzamiento: {ex.Message}");
+            }
+
             var config = await BuildLaunchConfigAsync(info, java);
             if (config == null)
             {

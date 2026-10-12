@@ -109,10 +109,26 @@ public class NewsService : INewsService
             }
 
             // 3. Guardar caché y 4. refrescar la UI
-            await File.WriteAllTextAsync(_cachePath, json);
+            var tmp = _cachePath + ".tmp";
+            await File.WriteAllTextAsync(tmp, json);
+            File.Move(tmp, _cachePath, overwrite: true);
             _logService.Info($"Noticias remotas actualizadas: {remote.Count} entradas");
 
-            OnNewsUpdated?.Invoke(this, remote);
+            // El refresh corre en un task de fondo: la UI debe recibir el
+            // evento en el hilo de Dispatcher.
+            var handler = OnNewsUpdated;
+            if (handler is null) return;
+
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher is { HasShutdownStarted: false, HasShutdownFinished: false }
+                && !dispatcher.CheckAccess())
+            {
+                await dispatcher.InvokeAsync(() => handler(this, remote));
+            }
+            else
+            {
+                handler(this, remote);
+            }
         }
         catch (Exception ex)
         {
