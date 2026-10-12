@@ -106,6 +106,11 @@ public class GameLauncherService : IGameLauncherService
     private string _lastSeriesName = string.Empty;
     private string _lastGameDir = string.Empty;
 
+    // Serializa lanzamientos: sin esto, doble clic o Home+Series
+    // simultáneos instalaban y arrancaban dos juegos sobre los mismos
+    // archivos (File.Create pisándose mutuamente).
+    private readonly SemaphoreSlim _launchGate = new(1, 1);
+
     public bool IsGameRunning => _runningProcess is { HasExited: false };
 
     public event EventHandler<GameCrashedArgs>? GameCrashed;
@@ -139,53 +144,31 @@ public class GameLauncherService : IGameLauncherService
     // ---------------------------------------------------------------
     public async Task<string?> FindJavaAsync(int minMajorVersion = 0)
     {
-        var candidates = new List<string>();
-
-        var settings = await _settingsService.GetSettingsAsync();
-        if (!string.IsNullOrWhiteSpace(settings.JavaPath))
-        {
-            candidates.Add(ResolveJavaExecutable(settings.JavaPath));
-        }
-
-        var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
-        if (!string.IsNullOrWhiteSpace(javaHome))
-        {
-            candidates.Add(Path.Combine(javaHome, "bin", "java.exe"));
-        }
-
-        candidates.Add("java");
-
-        var programFiles = new[]
-        {
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs")
-        };
-
-        foreach (var baseDir in programFiles.Where(d => !string.IsNullOrWhiteSpace(d)))
-        {
-            foreach (var dir in SafeEnumerateDirectories(baseDir, "Java", "Eclipse Adoptium", "Microsoft", "Amazon Corretto", "Zulu", "BellSoft"))
-            {
-                candidates.Add(Path.Combine(dir, "bin", "java.exe"));
-            }
-        }
-
-        foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+        // Una sola lista de candidatos (incluye los Javas descargados por
+        // el propio launcher): antes FindJavaAsync no miraba esa carpeta y
+        // la descarga automática se descartaba sin usarse.
+        foreach (var candidate in await GetJavaCandidates())
         {
             var version = await GetJavaVersionAsync(candidate);
             if (version < minMajorVersion) continue;
 
             if (candidate == "java")
             {
-                if (version >= minMajorVersion) return "java";
-                continue;
+                return "java";
             }
 
-            var full = Path.GetFullPath(candidate);
-            if (File.Exists(full))
+            try
             {
-                _logService.Info($"Java encontrado: {full} (v{version})");
-                return full;
+                var full = Path.GetFullPath(candidate);
+                if (File.Exists(full))
+                {
+                    _logService.Info($"Java encontrado: {full} (v{version})");
+                    return full;
+                }
+            }
+            catch
+            {
+                // Ruta inválida: se ignora y se sigue con el próximo
             }
         }
 
@@ -265,6 +248,8 @@ public class GameLauncherService : IGameLauncherService
         var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
         if (!string.IsNullOrWhiteSpace(javaHome))
         {
+            // javaw.exe primero: sin consola visible al lanzar el juego.
+            candidates.Add(Path.Combine(javaHome, "bin", "javaw.exe"));
             candidates.Add(Path.Combine(javaHome, "bin", "java.exe"));
         }
 
@@ -281,6 +266,7 @@ public class GameLauncherService : IGameLauncherService
         {
             foreach (var dir in SafeEnumerateDirectories(baseDir, "Java", "Eclipse Adoptium", "Microsoft", "Amazon Corretto", "Zulu", "BellSoft", "Eclipse Foundation", "AdoptOpenJDK"))
             {
+                candidates.Add(Path.Combine(dir, "bin", "javaw.exe"));
                 candidates.Add(Path.Combine(dir, "bin", "java.exe"));
             }
         }
@@ -310,6 +296,8 @@ public class GameLauncherService : IGameLauncherService
 
     private static async Task<(int Major, string Display)> GetJavaDisplayAsync(string javaPath)
     {
+        Process? p = null;
+        Task<string>? outputTask = null;
         try
         {
             var psi = new ProcessStartInfo
@@ -321,14 +309,15 @@ public class GameLauncherService : IGameLauncherService
                 CreateNoWindow = true
             };
 
-            using var p = Process.Start(psi);
+            p = Process.Start(psi);
             if (p == null) return (0, string.Empty);
 
             // Sin bloquear el hilo UI: WaitForExitAsync con timeout
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var outputTask = p.StandardError.ReadToEndAsync();
+            outputTask = p.StandardError.ReadToEndAsync();
             await p.WaitForExitAsync(cts.Token);
             var output = await outputTask;
+            outputTask = null;
 
             // openjdk version "17.0.11" ... / java version "1.8.0_412"
             var match = System.Text.RegularExpressions.Regex.Match(output, "version \"([\\d._]+)\"");
@@ -343,50 +332,48 @@ public class GameLauncherService : IGameLauncherService
         }
         catch
         {
+            // Timeout u otro error: matar el probe colgado (no dejar
+            // procesos zombi) y observar la lectura para que no quede
+            // como tarea faulteada no observada.
+            try
+            {
+                if (p is { HasExited: false }) p.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Ya salió solo
+            }
+
+            if (outputTask is not null)
+            {
+                try { await outputTask; } catch { /* lectura abortada */ }
+            }
+
             return (0, string.Empty);
+        }
+        finally
+        {
+            p?.Dispose();
         }
     }
     private static string ResolveJavaExecutable(string path)
     {
         if (File.Exists(path)) return path;
-        if (Directory.Exists(path)) return Path.Combine(path, "bin", "java.exe");
+        if (Directory.Exists(path))
+        {
+            // Preferir javaw.exe (sin consola); java.exe como respaldo.
+            var javaw = Path.Combine(path, "bin", "javaw.exe");
+            return File.Exists(javaw) ? javaw : Path.Combine(path, "bin", "java.exe");
+        }
         return path;
     }
 
     private static async Task<int> GetJavaVersionAsync(string javaPath)
     {
-        try
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = javaPath == "java" ? "java" : javaPath,
-                Arguments = "-version",
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            using var p = Process.Start(psi);
-            if (p == null) return 0;
-
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var outputTask = p.StandardError.ReadToEndAsync();
-            await p.WaitForExitAsync(cts.Token);
-            var output = await outputTask;
-
-            // "17.0.2" o "1.8.0_351"
-            var match = System.Text.RegularExpressions.Regex.Match(output, @"version ""(\d+)");
-            if (match.Success)
-            {
-                return int.Parse(match.Groups[1].Value);
-            }
-        }
-        catch
-        {
-            // Java no disponible
-        }
-
-        return 0;
+        // Un solo parser para todo: el regex viejo "version ""(\d+)"""
+        // leía 1.8.0_452 como versión "1" y rechazaba Java 8 siempre.
+        var (major, _) = await GetJavaDisplayAsync(javaPath);
+        return major;
     }
 
     private static IEnumerable<string> SafeEnumerateDirectories(string baseDir, params string[] names)
@@ -462,6 +449,14 @@ public class GameLauncherService : IGameLauncherService
     {
         var result = new LaunchResult();
 
+        // Gate de reentrada: sin él, dos clicks (o Home + Serie) lanzan
+        // dos instalaciones/procesos en paralelo sobre los mismos archivos.
+        if (!await _launchGate.WaitAsync(0))
+        {
+            result.Message = "Ya hay un lanzamiento en curso.";
+            return result;
+        }
+
         try
         {
             if (IsGameRunning)
@@ -523,8 +518,10 @@ public class GameLauncherService : IGameLauncherService
                 await _minecraftInstall.InstallVersionAsync(mcVersion, progress, CancellationToken.None);
             }
 
-            // Instalar Forge si falta
-            if (!await _forgeInstall.IsForgeInstalledAsync(mcVersion))
+            // Instalar Forge solo si la serie ES Forge: antes se instalaba
+            // Forge para cualquier loader (vanilla incluido) a ciegas.
+            var isForge = IsForgeLoader(loader);
+            if (isForge && !await _forgeInstall.IsForgeInstalledAsync(mcVersion))
             {
                 _notificationService.NotifyInfo(
                     "Descargando Forge",
@@ -544,8 +541,10 @@ public class GameLauncherService : IGameLauncherService
                 _logService.Info($"Java {requiredJava} no encontrado: descargando automáticamente");
                 try
                 {
-                    await _javaDownloader.DownloadJavaAsync(requiredJava, progress, CancellationToken.None);
-                    java = await FindJavaAsync(requiredJava);
+                    // Usar la ruta devuelta: FindJavaAsync no veía la carpeta
+                    // propia del launcher y el resultado se descartaba.
+                    java = await _javaDownloader.DownloadJavaAsync(requiredJava, progress, CancellationToken.None)
+                           ?? await FindJavaAsync(requiredJava);
                 }
                 catch (Exception ex)
                 {
@@ -574,7 +573,9 @@ public class GameLauncherService : IGameLauncherService
                 Arguments = BuildArguments(config),
                 WorkingDirectory = config.GameDir,
                 UseShellExecute = false,
-                CreateNoWindow = false
+                // javaw es GUI (indiferente); si sólo existiera java.exe de
+                // consola, evita la ventana de terminal visible.
+                CreateNoWindow = true
             };
 
             var process = Process.Start(psi);
@@ -586,8 +587,8 @@ public class GameLauncherService : IGameLauncherService
             }
 
             _runningProcess = process;
-            _runningProcess.EnableRaisingEvents = true;
             _runningProcess.Exited += OnGameExited;
+            _runningProcess.EnableRaisingEvents = true;
             _lastSeriesId = info.Id;
             _lastSeriesName = info.Name;
             _lastGameDir = config.GameDir;
@@ -609,8 +610,10 @@ public class GameLauncherService : IGameLauncherService
         }
         catch (OperationCanceledException)
         {
-            result.Message = "Instalación cancelada.";
-            _notificationService.NotifyInfo("Cancelado", "La instalación de Minecraft fue cancelada.");
+            // Puede ser un timeout interno (no un cancel del usuario):
+            // el mensaje no debe afirmar que "alguien" canceló.
+            result.Message = "La instalación se interrumpió.";
+            _notificationService.NotifyInfo("Interrumpido", "La instalación de Minecraft se interrumpió (timeout o cancelación).");
             return result;
         }
         catch (Exception ex)
@@ -620,10 +623,21 @@ public class GameLauncherService : IGameLauncherService
             _notificationService.NotifyError("Error de inicio", $"No se pudo iniciar la serie: {ex.Message}");
             return result;
         }
+        finally
+        {
+            _launchGate.Release();
+        }
     }
+
+    private static bool IsForgeLoader(string? loader)
+        => string.Equals(loader?.Trim(), "Forge", StringComparison.OrdinalIgnoreCase);
 
     private void OnGameExited(object? sender, EventArgs e)
     {
+        // Evento viejo de un proceso que ya no es el actual (carrera entre
+        // lanzamientos): no tocar el estado del proceso vigente.
+        if (!ReferenceEquals(sender, _runningProcess)) return;
+
         int exitCode = -1;
         try
         {
@@ -675,11 +689,13 @@ public class GameLauncherService : IGameLauncherService
         var mcVersion = info.Definition.MinecraftVersion;
 
         var maxRAM = settings.AllocatedRAM;
-        var available = GetAvailablePhysicalMemoryMB();
+        var totalPhys = GetTotalPhysicalMemoryMB();
 
-        if (available > 0)
+        if (totalPhys > 0)
         {
-            maxRAM = Math.Min(maxRAM, (int)(available * 0.75));
+            // Tope sobre la RAM FÍSICA TOTAL: el cálculo anterior usaba la
+            // libre (PowerShell, que además ni parseaba) y era caótico.
+            maxRAM = Math.Min(maxRAM, (int)(totalPhys * 0.75));
         }
 
         maxRAM = Math.Max(2048, maxRAM);
@@ -692,8 +708,14 @@ public class GameLauncherService : IGameLauncherService
 
         // Lanzamiento moderno (Forge >= 1.17, p.ej. 1.20.1): BootstrapLauncher
         // con module-path. Requiere el version.json de Forge; si no hay,
-        // se usa el launchwrapper clásico.
-        var forgeData = await _forgeInstall.TryGetForgeLaunchDataAsync(info.InstallPath, mcVersion);
+        // se usa el launchwrapper clásico. Solo para series Forge.
+        var isForge = IsForgeLoader(info.Definition.Loader);
+        ForgeLaunchData? forgeData = null;
+        if (isForge)
+        {
+            forgeData = await _forgeInstall.TryGetForgeLaunchDataAsync(info.InstallPath, mcVersion);
+        }
+
         var useBootstrap = forgeData != null
             && File.Exists(forgeData.ForgeJar)
             && forgeData.JvmArgs.Count > 0;
@@ -714,10 +736,13 @@ public class GameLauncherService : IGameLauncherService
         }
         else
         {
-            var forgeJar = await _forgeInstall.GetForgeJarPathAsync(mcVersion);
             classpathParts.Add(clientJar);
             classpathParts.AddRange(libraries);
-            classpathParts.Add(forgeJar);
+            if (isForge)
+            {
+                var forgeJar = await _forgeInstall.GetForgeJarPathAsync(mcVersion);
+                classpathParts.Add(forgeJar);
+            }
         }
 
         var nativesDir = await _minecraftInstall.GetNativesDirAsync(mcVersion);
@@ -804,14 +829,22 @@ public class GameLauncherService : IGameLauncherService
         var jvm = $"-Xms{config.MinRAM}M -Xmx{config.MaxRAM}M";
         if (!string.IsNullOrWhiteSpace(config.JvmArgs)) jvm += " " + config.JvmArgs;
 
-        var gameArgs = $"--username {config.Username} " +
-                $"--version {(config.UseBootstrap && !string.IsNullOrEmpty(config.ForgeVersionId) ? config.ForgeVersionId : config.MinecraftVersion + "-forge")} " +
+        // Todos los valores dinámicos se comillan: un usuario/UUID/token
+        // con espacios o comillas no puede inyectar argumentos extra.
+        var versionId = config.UseBootstrap && !string.IsNullOrEmpty(config.ForgeVersionId)
+            ? config.ForgeVersionId
+            : config.Loader.Equals("Forge", StringComparison.OrdinalIgnoreCase)
+                ? config.MinecraftVersion + "-forge"
+                : config.MinecraftVersion;
+
+        var gameArgs = $"--username {QuoteIfNeeded(config.Username)} " +
+                $"--version {QuoteIfNeeded(versionId)} " +
                 $"--gameDir \"{config.GameDir}\" " +
                 $"--assetsDir \"{config.AssetsDir}\" " +
-                $"--assetIndex {config.AssetIndex} " +
-                $"--uuid {config.UUID} " +
-                $"--accessToken {config.AccessToken} " +
-                $"--userType {config.UserType}";
+                $"--assetIndex {QuoteIfNeeded(config.AssetIndex)} " +
+                $"--uuid {QuoteIfNeeded(config.UUID)} " +
+                $"--accessToken {QuoteIfNeeded(config.AccessToken)} " +
+                $"--userType {QuoteIfNeeded(config.UserType)}";
 
         if (config.Fullscreen) gameArgs += " --fullscreen";
         if (config.Width > 0 && config.Height > 0)
@@ -830,32 +863,55 @@ public class GameLauncherService : IGameLauncherService
                     gameArgs + " " + config.ForgeGameArgs;
         }
 
-        // Clásico (vanilla / Forge <= 1.16 con launchwrapper).
-        gameArgs += " --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker";
+        var isForge = config.Loader.Equals("Forge", StringComparison.OrdinalIgnoreCase);
+        if (isForge)
+        {
+            // Clásico (Forge <= 1.16 con launchwrapper).
+            gameArgs += " --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker";
+        }
+
+        // Vanilla (y Forge clásico): main class del version.json de MC.
+        var mainClass = isForge
+            ? "net.minecraft.launchwrapper.Launch"
+            : "net.minecraft.client.main.Main";
 
         return $"{jvm} " +
                 $"-Djava.library.path=\"{config.NativesDir}\" " +
                 $"-cp \"{config.Classpath}\" " +
-                "net.minecraft.launchwrapper.Launch " +
+                mainClass + " " +
                 gameArgs;
     }
 
-    private static long GetAvailablePhysicalMemoryMB()
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct MemoryStatusEx
+    {
+        public uint dwLength;
+        public uint dwMemoryLoad;
+        public ulong ullTotalPhys;
+        public ulong ullAvailPhys;
+        public ulong ullTotalPageFile;
+        public ulong ullAvailPageFile;
+        public ulong ullTotalVirtual;
+        public ulong ullAvailVirtual;
+        public ulong ullAvailExtendedVirtual;
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx lpBuffer);
+
+    /// <summary>
+    /// RAM física total en MB vía GlobalMemoryStatusEx (antes: PowerShell
+    /// síncrono en el hilo UI, con parseo que siempre devolvía 0).
+    /// </summary>
+    private static long GetTotalPhysicalMemoryMB()
     {
         try
         {
-            using var proc = Process.Start(new ProcessStartInfo
-            {
-                FileName = "powershell",
-                Arguments = "-NoProfile -Command \"(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1KB\"",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
-            if (proc == null) return 0;
-            var output = proc.StandardOutput.ReadToEnd().Trim();
-            proc.WaitForExit(5000);
-            return long.TryParse(output, out var mb) ? mb : 0;
+            var status = new MemoryStatusEx();
+            status.dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf<MemoryStatusEx>();
+            return GlobalMemoryStatusEx(ref status)
+                ? (long)(status.ullTotalPhys / (1024UL * 1024UL))
+                : 0;
         }
         catch
         {
