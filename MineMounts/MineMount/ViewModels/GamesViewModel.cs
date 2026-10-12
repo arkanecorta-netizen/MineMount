@@ -89,14 +89,20 @@ public partial class GamesViewModel : ObservableObject
             IsLoading = true;
             StatusText = $"Instalando {version.Name}...";
 
-            await _minecraftService.InstallVersionAsync(version);
+            // Instalación real con progreso (antes era Task.Delay + texto
+            // "instalado" sin hacer nada)
+            var progress = new Progress<double>(p =>
+            {
+                StatusText = $"Instalando {version.Name}... {p:0}%";
+            });
+            await _minecraftService.InstallVersionAsync(version, progress);
 
             StatusText = $"{version.Name} instalado";
         }
         catch (Exception ex)
         {
             _logService.Error($"Failed to install version {version.Name}", ex);
-            StatusText = "Error al instalar";
+            StatusText = $"Error al instalar {version.Name}: {ex.Message}";
         }
         finally
         {
@@ -109,24 +115,11 @@ public partial class GamesViewModel : ObservableObject
     {
         if (modpack == null) return;
 
-        try
-        {
-            IsLoading = true;
-            StatusText = $"Instalando {modpack.Name}...";
-
-            await _modpackService.InstallModpackAsync(modpack);
-
-            StatusText = $"{modpack.Name} instalado";
-        }
-        catch (Exception ex)
-        {
-            _logService.Error($"Failed to install modpack {modpack.Name}", ex);
-            StatusText = "Error al instalar";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        // Los modpacks todavía no se pueden instalar (requiere integración
+        // con CurseForge/Modrinth): decir la verdad en vez de simular una
+        // instalación exitosa.
+        await Task.CompletedTask;
+        StatusText = $"Los modpacks estarán disponibles próximamente ({modpack.Name}).";
     }
 
     [RelayCommand]

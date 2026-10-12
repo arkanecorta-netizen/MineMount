@@ -16,6 +16,7 @@ namespace MineMount.Services;
 public interface IMinecraftInstallService
 {
     Task<MinecraftVersionJson?> GetVersionAsync(string versionId);
+    Task<List<Models.MinecraftVersion>> GetAvailableVersionsAsync();
     Task<bool> IsVersionInstalledAsync(string versionId);
     Task InstallVersionAsync(string versionId, IProgress<double>? progress, CancellationToken cancellationToken);
     Task<string> GetClientJarPathAsync(string versionId);
@@ -160,10 +161,17 @@ public class MinecraftInstallService : IMinecraftInstallService
             {
                 foreach (var v in versions.EnumerateArray())
                 {
+                    if (!v.TryGetProperty("id", out var idProp) || idProp.GetString() is not string id)
+                        continue;
                     list.Add(new VersionManifestEntry
                     {
-                        Id = v.GetProperty("id").GetString() ?? string.Empty,
-                        Url = v.GetProperty("url").GetString() ?? string.Empty
+                        Id = id,
+                        Url = v.TryGetProperty("url", out var u) ? u.GetString() ?? string.Empty : string.Empty,
+                        Type = v.TryGetProperty("type", out var t) ? t.GetString() ?? "release" : "release",
+                        ReleaseTime = v.TryGetProperty("releaseTime", out var rt)
+                                      && DateTime.TryParse(rt.GetString(), out var d)
+                            ? d
+                            : DateTime.MinValue
                     });
                 }
             }
@@ -174,6 +182,30 @@ public class MinecraftInstallService : IMinecraftInstallService
             _logService.Error("No se pudo obtener el manifest de versiones", ex);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Catálogo real de versiones de Mojang (releases + snapshots) para la
+    /// página Juegos, ordenado del más reciente al más antiguo.
+    /// </summary>
+    public async Task<List<Models.MinecraftVersion>> GetAvailableVersionsAsync()
+    {
+        var manifest = await FetchVersionManifestAsync();
+        if (manifest == null) return new List<Models.MinecraftVersion>();
+
+        return manifest
+            .Where(v => !string.IsNullOrWhiteSpace(v.Url))
+            .Select(v => new Models.MinecraftVersion
+            {
+                Id = v.Id,
+                Name = string.Equals(v.Type, "release", StringComparison.OrdinalIgnoreCase)
+                    ? v.Id
+                    : $"Snapshot {v.Id}",
+                Type = v.Type,
+                ReleaseDate = v.ReleaseTime
+            })
+            .OrderByDescending(v => v.ReleaseDate)
+            .ToList();
     }
 
     // ---------------------------------------------------------------
@@ -627,6 +659,8 @@ public class MinecraftInstallService : IMinecraftInstallService
     {
         public string Id { get; set; } = string.Empty;
         public string Url { get; set; } = string.Empty;
+        public string Type { get; set; } = "release";
+        public DateTime ReleaseTime { get; set; }
     }
 }
 
